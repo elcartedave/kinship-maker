@@ -1,0 +1,444 @@
+@import "tailwindcss";
+@import "@xyflow/react/dist/style.css";
+
+:root {
+  --background: #f7eed4;
+  --background-strong: #efe1b7;
+  --panel: rgba(255, 251, 239, 0.92);
+  --panel-strong: #fff8e8;
+  --ink: #2f2413;
+  --ink-soft: #62543c;
+  --line: rgba(105, 85, 47, 0.18);
+  --accent: #b76a2f;
+  --accent-strong: #7f3b0c;
+  --accent-cool: #567aa2;
+  --shadow: 0 20px 45px rgba(74, 54, 23, 0.14);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-background-strong: var(--background-strong);
+  --color-panel: var(--panel);
+  --color-panel-strong: var(--panel-strong);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-cool: var(--accent-cool);
+  --font-sans: var(--font-body);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(circle at top left, rgba(255, 249, 231, 0.95), transparent 35%),
+    radial-gradient(circle at top right, rgba(223, 194, 140, 0.26), transparent 30%),
+    linear-gradient(180deg, #fbf5e6 0%, var(--background) 100%);
+  color: var(--ink);
+  font-family: var(--font-body), sans-serif;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+.font-display {
+  font-family: var(--font-display), serif;
+}
+
+.paper-panel {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(18px);
+}
+
+.paper-grid {
+  background-color: rgba(255, 255, 255, 0.35);
+  background-image:
+    linear-gradient(rgba(132, 112, 67, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(132, 112, 67, 0.08) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.kinship-canvas-surface {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  background: #fffdfa;
+}
+
+.kinship-canvas-grid {
+  flex: 1;
+  width: 100%;
+  background-color: #fffdfa;
+    min-height: 100%;
+    display: flex;
+  background-image:
+    linear-gradient(rgba(139, 129, 114, 0.18) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(139, 129, 114, 0.18) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.kinship-toolbar-panel {
+  border: 1px solid rgba(104, 78, 34, 0.14);
+  background: rgba(255, 252, 244, 0.94);
+  box-shadow: 0 18px 36px rgba(47, 36, 19, 0.12);
+  backdrop-filter: blur(18px);
+}
+
+.kinship-floating-panel {
+  border: 1px solid rgba(104, 78, 34, 0.14);
+  background: rgba(255, 252, 244, 0.92);
+  box-shadow: 0 18px 36px rgba(47, 36, 19, 0.14);
+  backdrop-filter: blur(18px);
+  pointer-events: auto;
+}
+
+.tool-chip {
+  border: 1px solid rgba(104, 78, 34, 0.16);
+  background: rgba(255, 251, 241, 0.82);
+  color: var(--ink-soft);
+  transition:
+    transform 140ms ease,
+    background-color 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease;
+}
+
+.tool-chip:hover {
+  transform: translateY(-1px);
+  border-color: rgba(127, 59, 12, 0.24);
+  color: var(--ink);
+}
+
+.tool-chip[data-active="true"] {
+  border-color: rgba(127, 59, 12, 0.34);
+  background: rgba(255, 237, 212, 0.98);
+  color: var(--accent-strong);
+  box-shadow: inset 0 0 0 1px rgba(127, 59, 12, 0.08);
+}
+
+.kinship-node-card {
+  position: relative;
+  display: flex;
+  height: 100%;
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 1.5rem;
+  background: transparent;
+}
+
+.react-flow__attribution {
+  display: none;
+}
+
+.react-flow__handle {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(255, 248, 232, 0.96);
+  box-shadow: 0 0 0 1px rgba(127, 59, 12, 0.18);
+  opacity: 0;
+  transition:
+    opacity 140ms ease,
+    transform 140ms ease;
+  transform: scale(0.92);
+}
+
+.react-flow__node,
+.react-flow__node.selectable {
+  cursor: default;
+}
+
+.react-flow__node:active,
+.react-flow__node.selectable:active {
+  cursor: grabbing;
+}
+
+/* React Flow ships `.react-flow__edge.selectable { cursor: pointer; }`.
+   Use the standard arrow on edges too so the whole canvas stays consistent
+   with the pointer tool's expected default-arrow cursor. */
+.react-flow__edge,
+.react-flow__edge.selectable {
+  cursor: default;
+}
+
+.react-flow__node:hover .react-flow__handle,
+.react-flow__node.selected .react-flow__handle,
+.react-flow__handle.connectingfrom,
+.react-flow__handle.connectionindicator {
+  opacity: 0.95;
+  transform: scale(1);
+}
+
+.kinship-handle-lineage {
+  background: rgba(183, 106, 47, 0.94);
+}
+
+.kinship-handle-side {
+  background: rgba(86, 122, 162, 0.94);
+}
+
+/* Nudge endpoints outward so they’re easier to grab. */
+.react-flow__handle-top {
+  transform: translateY(-6px) scale(0.92);
+}
+
+.react-flow__handle-bottom {
+  transform: translateY(6px) scale(0.92);
+}
+
+.react-flow__handle-left {
+  transform: translateX(-6px) scale(0.92);
+}
+
+.react-flow__handle-right {
+  transform: translateX(6px) scale(0.92);
+}
+
+.kinship-handle-hidden {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+.react-flow__node.selected .kinship-node-card {
+  /* Sit the selection outline right at the node edge (where the handles
+     are) and skip the inner halo, so connecting lines look attached to
+     the selected node instead of separated by a band of padding. */
+  outline: 2px solid rgba(127, 59, 12, 0.88);
+  outline-offset: 0px;
+  box-shadow: 0 8px 20px rgba(183, 106, 47, 0.2);
+  filter: none;
+}
+
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke: rgb(127 59 12) !important;
+  stroke-width: 3 !important;
+}
+.react-flow__connection-path {
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.react-flow__pane {
+  background: transparent;
+}
+
+.canvas-tool-hand .react-flow__pane {
+  cursor: grab;
+}
+
+.canvas-tool-hand .react-flow__pane:active {
+  cursor: grabbing;
+}
+
+/* React Flow ships `.react-flow__pane.selection { cursor: pointer; }` when
+   selectionOnDrag is active. Force the pointer tool to always show the
+   standard arrow regardless of pane state (selection / draggable / dragging)
+   — `!important` ensures we beat React Flow's bundled CSS even if its
+   stylesheet ends up loaded after ours in the cascade. */
+.canvas-tool-pointer .react-flow__pane,
+.canvas-tool-pointer .react-flow__pane.selection,
+.canvas-tool-pointer .react-flow__pane.draggable,
+.canvas-tool-pointer .react-flow__pane.dragging {
+  cursor: default !important;
+}
+
+.react-flow__background path,
+.react-flow__background line {
+  stroke: rgba(114, 95, 61, 0.2);
+}
+
+.react-flow__controls {
+  border: 1px solid rgba(104, 78, 34, 0.14);
+  background: rgba(255, 251, 241, 0.9);
+  box-shadow: var(--shadow);
+}
+
+.react-flow__controls-button {
+  border-bottom-color: rgba(104, 78, 34, 0.12);
+  background: transparent;
+  color: var(--ink-soft);
+}
+
+.react-flow__panel {
+  margin: 0;
+  pointer-events: auto;
+  z-index: 12;
+}
+
+.react-flow__panel * {
+  pointer-events: auto;
+}
+
+.react-flow__minimap {
+  border: 1px solid rgba(104, 78, 34, 0.14);
+  background: rgba(255, 251, 241, 0.94);
+  box-shadow: var(--shadow);
+}
+
+.kinship-node-label {
+  min-width: 2.6rem;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: 0.12em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.kinship-node-label:focus {
+  outline: none;
+}
+
+.kinship-symbol-chip[data-active="true"] {
+  border-color: rgba(127, 59, 12, 0.34);
+  background: rgba(255, 237, 212, 0.98);
+  color: var(--accent-strong);
+  box-shadow: inset 0 0 0 1px rgba(127, 59, 12, 0.08);
+}
+
+/* ---------------------------------------------------------------------------
+ * Free-form text annotation nodes.
+ *   – Wrapper auto-grows with the content (no fixed React Flow node size).
+ *   – Selection outline hugs the actual rendered text rather than a fixed box.
+ *   – Display vs textarea share the same paddings/line-height so width does
+ *     not jump when entering / leaving edit mode.
+ * -------------------------------------------------------------------------*/
+
+.kinship-text-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  padding: 4px 6px;
+  border-radius: 8px;
+  background: transparent;
+  cursor: default;
+  overflow: visible;
+}
+
+/* Inner rotor wrapper — receives the CSS rotation transform so the visible
+   text rotates while the React Flow bounding box (used for drag/resize math)
+   stays axis-aligned. width:100% means rotated text wraps within the
+   user-resized box, so widening the box prevents auto-wrap. */
+.kinship-text-card__rotor {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  transform-origin: 50% 50%;
+}
+
+.kinship-text-card__display {
+  white-space: pre-wrap;
+  word-break: break-word;
+  padding: 0;
+  margin: 0;
+  width: 100%;
+}
+
+/* Rotation handle — small circle floating above the bounding box, with a
+   dashed stem connecting it to the top edge so the rotation pivot is
+   visually obvious. Anchored to the axis-aligned wrapper (NOT the rotor)
+   so the affordance lives where the user expects, just like Canva/Figma. */
+.kinship-text-card__rotation-handle {
+  position: absolute;
+  left: 50%;
+  top: -28px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: rgba(127, 59, 12, 0.92);
+  border: 1.5px solid white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+  cursor: grab;
+  transform: translateX(-50%);
+  z-index: 5;
+  touch-action: none;
+}
+
+.kinship-text-card__rotation-handle:active {
+  cursor: grabbing;
+}
+
+.kinship-text-card__rotation-handle-stem {
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  height: 14px;
+  width: 0;
+  transform: translateX(-50%);
+  border-left: 1.5px dashed rgba(127, 59, 12, 0.55);
+}
+
+.kinship-text-card__textarea {
+  width: 100%;
+  min-width: 4ch;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  resize: none;
+  overflow: hidden;
+  white-space: pre-wrap;
+  word-break: break-word;
+  cursor: text;
+}
+
+/* When a text node is selected, NodeResizer draws the bounding-box line
+   and 8 corner/side handles. We only add a subtle background tint here so
+   the box reads as "active" without doubling the outline. */
+.kinship-text-card--selected {
+  background: rgba(255, 251, 241, 0.55);
+  box-shadow: 0 6px 14px rgba(183, 106, 47, 0.18);
+}
+
+/* Suppress the default React Flow selection halo on text nodes — we draw our
+   own tighter outline on `.kinship-text-card`, otherwise both stack and the
+   user sees a phantom 2nd box around the text. */
+.react-flow__node-kinshipText.selected,
+.react-flow__node-kinshipText:focus,
+.react-flow__node-kinshipText:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Editing state: subtle dashed border so the user can see the editable area
+   even while the textarea has focus and no glyphs to hint at its bounds. */
+.kinship-text-card--editing {
+  outline: 1px dashed rgba(127, 59, 12, 0.6);
+  outline-offset: 0px;
+  background: rgba(255, 251, 241, 0.85);
+}
