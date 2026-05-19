@@ -829,18 +829,19 @@ export function DashboardPage() {
           <div className="mb-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.18em] text-gold">
-                RECENT CHARTS
+                WORKSPACE SYSTEM
               </p>
               <h4 className="mt-1 font-serif text-[clamp(32px,4vw,52px)] font-extrabold leading-[1.1] tracking-[-0.02em] text-ink">
-                Pick up where you left off
+                Your Diagram Workspace
               </h4>
               <p className="text-sm text-slate font-medium mt-3">
-                {charts.length} {charts.length === 1 ? "chart" : "charts"} available
+                {charts.length + pendingInvitations.length} total items available 
+                {pendingInvitations.length > 0 && ` (${pendingInvitations.length} pending approval)`}
               </p>
             </div>
 
             {/* VIEW TOGGLES & SORT */}
-            {charts.length > 0 && (
+            {(charts.length > 0 || pendingInvitations.length > 0) && (
               <div className="flex items-center gap-3 select-none shrink-0 self-end sm:self-auto">
 
                 <button
@@ -905,7 +906,7 @@ export function DashboardPage() {
             )}
           </div>
 
-          {charts.length === 0 ? (
+          {charts.length === 0 && pendingInvitations.length === 0 ? (
             /* EMPTY STATE */
             <div className="rounded-[24px] border border-dashed border-warm bg-white p-12 md:p-20 text-center shadow-[0_4px_24px_rgba(15,14,13,0.02)]">
               <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-cream text-gold">
@@ -917,23 +918,108 @@ export function DashboardPage() {
                 Your workspace is empty
               </h3>
               <p className="mx-auto mt-3 max-w-md text-[17px] leading-[1.65] text-slate">
-                Create a clean chart or load a predefined archetype template to begin tracking your lineage trees.
+                Create a clean chart or accept an authorization invitation to populate your layout view.
               </p>
             </div>
           ) : (
             <div>
               {viewMode === "grid" ? (
-                /* GRID VIEW */
+                /* GRID VIEW CONTAINER */
                 <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
+                  
+                  {/* PENDING INVITATIONS INLINED INTO GRID */}
+                  {pendingInvitations.map((invitation) => {
+                    const isBusy = busyAction === invitation.id;
+                    const isApproved = invitation.status === "approved";
+
+                    return (
+                      <article
+                        key={invitation.id}
+                        className="group flex flex-col justify-between rounded-2xl border border-dashed border-gold/40 bg-white p-6 shadow-[0_4px_24px_rgba(15,14,13,0.02)] transition-all duration-300 hover:-translate-y-1 hover:border-gold hover:shadow-[0_16px_48px_rgba(0,0,0,.08)]"
+                      >
+                        <div>
+                          {/* Symmetrical Invitation Diagram Graphic */}
+                          <div className="mb-4 rounded-xl bg-cream p-4 border border-warm relative overflow-hidden">
+                            <svg viewBox="0 0 240 100" className="h-24 w-full opacity-90">
+                              <circle cx="70" cy="50" r="12" fill="#5a7a6a" />
+                              <circle cx="170" cy="50" r="12" fill="#c9933a" />
+                              <line x1="82" y1="50" x2="158" y2="50" stroke="#b0a290" strokeWidth="2" strokeDasharray="5" />
+                            </svg>
+                          </div>
+
+                          <div className="flex items-start justify-between gap-2">
+                            <h5 className="font-serif text-[22px] font-bold tracking-tight text-ink">
+                              {invitation.chartTitle}
+                            </h5>
+                            <span className="shrink-0 rounded-full bg-[#fff3d8] px-2.5 py-0.5 text-[10px] font-bold text-[#b8860b] uppercase tracking-wide">
+                              Pending Link
+                            </span>
+                          </div>
+
+                          <p className="mt-1 text-xs text-slate font-medium">
+                            Shared by: <span className="text-gold font-semibold">{invitation.inviterLabel}</span>
+                          </p>
+                        </div>
+
+                        {/* Footer Action Blocks */}
+                        <div className="mt-6 flex items-center gap-3 border-t border-warm pt-4">
+                          {!isApproved ? (
+                            <>
+                              <button
+                                type="button"
+                                disabled={isBusy}
+                                onClick={() => void handleInvitation(invitation.id, "approve")}
+                                className="flex-1 h-[46px] flex items-center justify-center rounded-[10px] bg-gold text-ink text-xs font-bold transition-all duration-300 hover:bg-ink hover:text-cream hover:-translate-y-0.5 cursor-pointer"
+                              >
+                                {isBusy ? "Processing..." : "Accept Link"}
+                              </button>
+
+                              <button
+                                type="button"
+                                disabled={isBusy}
+                                onClick={() => void handleInvitation(invitation.id, "reject")}
+                                className="h-[46px] px-4 flex items-center justify-center rounded-[10px] border border-warm bg-white text-slate text-xs font-semibold transition-all hover:border-rust hover:bg-rust/5 hover:text-rust cursor-pointer"
+                              >
+                                Decline
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <Link
+                                href={`/charts/${invitation.chartId}`}
+                                className="flex-1 h-[46px] flex items-center justify-center rounded-[10px] bg-ink text-cream text-xs font-semibold transition-all duration-300 hover:bg-gold hover:text-ink hover:-translate-y-0.5"
+                              >
+                                <span className="text-white">Open Editor</span>
+                              </Link>
+
+                              <button
+                                type="button"
+                                onClick={() => void handleInvitation(invitation.id, "reject")}
+                                className="flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-[10px] border border-warm bg-white text-slate transition-all hover:border-rust hover:bg-rust/5 hover:text-rust cursor-pointer"
+                              >
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                                </svg>
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </article>
+                    );
+                  })}
+
+                  {/* ACTIVE STANDARD WORKSPACE CHARTS */}
                   {sortedCharts.map((chart) => {
                     const isDeleting = busyAction === chart.id;
+                    // Check if current user is NOT the owner
+                    const isOwnedByOther = user && chart.ownerId && chart.ownerId !== user.id;
+
                     return (
                       <article
                         key={chart.id}
                         className="group flex flex-col justify-between rounded-2xl border border-warm bg-white p-6 shadow-[0_4px_24px_rgba(15,14,13,0.02)] transition-all duration-300 hover:-translate-y-1 hover:border-gold/30 hover:shadow-[0_16px_48px_rgba(0,0,0,.08)]"
                       >
                         <div>
-                          {/* SVG Thumbnail */}
                           <div className="mb-4 rounded-xl bg-cream p-4 border border-warm relative overflow-hidden">
                             <svg viewBox="0 0 240 100" className="h-24 w-full">
                               <circle cx="50" cy="30" r="10" fill="#c9933a" />
@@ -959,7 +1045,9 @@ export function DashboardPage() {
 
                           <div className="mt-4 flex flex-wrap gap-2">
                             <span className="rounded-full bg-[#eef0e5] px-3 py-1 text-xs font-bold text-[#5f6d53]">
-                              {authEnabled ? "Your Chart" : chart.ownerId ? "Cloud-Ready" : "Local"}
+                              {isOwnedByOther 
+                                ? `Owned by ${chart.ownerLabel ?? "Other User"}` 
+                                : authEnabled ? "Your Chart" : chart.ownerId ? "Cloud-Ready" : "Local"}
                             </span>
                             {chart.dirty && (
                               <span className="rounded-full bg-[#fff3d8] px-3 py-1 text-xs font-bold text-[#b8860b] animate-pulse">
@@ -969,7 +1057,6 @@ export function DashboardPage() {
                           </div>
                         </div>
 
-                        {/* Footer */}
                         <div className="mt-6 flex items-center gap-3 border-t border-warm pt-4">
                           <Link
                             href={`/charts/${chart.id}`}
@@ -1006,16 +1093,96 @@ export function DashboardPage() {
                   })}
                 </div>
               ) : (
-                /* LIST VIEW */
+                /* LIST VIEW CONTAINER */
                 <div className="flex flex-col gap-3">
+                  
+                  {/* LIST VIEW: INVITATIONS */}
+                  {pendingInvitations.map((invitation) => {
+                    const isBusy = busyAction === invitation.id;
+                    const isApproved = invitation.status === "approved";
+
+                    return (
+                      <article
+                        key={invitation.id}
+                        className="group flex flex-col sm:flex-row sm:items-center justify-between rounded-2xl border border-dashed border-gold/40 bg-white p-4 shadow-[0_4px_24px_rgba(15,14,13,0.02)] transition-all duration-300 hover:-translate-y-0.5 hover:border-gold"
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="hidden sm:flex h-12 w-20 shrink-0 items-center justify-center rounded-lg bg-cream border border-warm overflow-hidden">
+                            <svg viewBox="0 0 240 100" className="h-8 w-full opacity-80">
+                              <circle cx="60" cy="50" r="14" fill="#5a7a6a" />
+                              <circle cx="180" cy="50" r="14" fill="#c9933a" />
+                              <line x1="74" y1="50" x2="166" y2="50" stroke="#b0a290" strokeWidth="3" strokeDasharray="6" />
+                            </svg>
+                          </div>
+                          <div>
+                            <div className="flex flex-wrap items-center gap-2.5">
+                              <h5 className="font-serif text-[20px] font-bold tracking-tight text-ink">
+                                {invitation.chartTitle}
+                              </h5>
+                              <span className="rounded-full bg-[#fff3d8] px-2.5 py-0.5 text-[10px] font-bold text-[#b8860b]">
+                                Shared Link Request
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate font-medium mt-0.5">
+                              From: <span className="text-gold font-semibold">{invitation.inviterLabel}</span>
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="mt-4 sm:mt-0 flex items-center gap-2 sm:w-auto w-full">
+                          {!isApproved ? (
+                            <>
+                              <button
+                                type="button"
+                                disabled={isBusy}
+                                onClick={() => void handleInvitation(invitation.id, "approve")}
+                                className="h-[46px] px-6 flex items-center justify-center rounded-[10px] bg-gold text-ink text-xs font-bold transition-all duration-300 hover:bg-ink hover:text-cream hover:-translate-y-0.5 cursor-pointer"
+                              >
+                                Accept
+                              </button>
+                              <button
+                                type="button"
+                                disabled={isBusy}
+                                onClick={() => void handleInvitation(invitation.id, "reject")}
+                                className="h-[46px] px-4 flex items-center justify-center rounded-[10px] border border-warm bg-white text-slate text-xs font-medium transition-all hover:border-rust hover:text-rust"
+                              >
+                                Decline
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <Link
+                                href={`/charts/${invitation.chartId}`}
+                                className="h-[46px] flex items-center justify-center rounded-[10px] bg-ink text-cream text-xs font-semibold transition-all duration-300 hover:bg-gold hover:text-ink hover:-translate-y-0.5 px-5"
+                              >
+                                <span className="text-white">Open Editor</span>
+                              </Link>
+                              <button
+                                type="button"
+                                onClick={() => void handleInvitation(invitation.id, "reject")}
+                                className="flex h-[40px] w-[40px] shrink-0 items-center justify-center rounded-[10px] border border-warm bg-white text-slate transition-all hover:border-rust hover:bg-rust/5 hover:text-rust cursor-pointer"
+                              >
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                                </svg>
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </article>
+                    );
+                  })}
+
+                  {/* LIST VIEW: ACTIVE CHARTS */}
                   {sortedCharts.map((chart) => {
                     const isDeleting = busyAction === chart.id;
+                    const isOwnedByOther = user && chart.ownerId && chart.ownerId !== user.id;
+
                     return (
                       <article
                         key={chart.id}
                         className="group flex flex-col sm:flex-row sm:items-center justify-between rounded-2xl border border-warm bg-white p-4 shadow-[0_4px_24px_rgba(15,14,13,0.02)] transition-all duration-300 hover:-translate-y-0.5 hover:border-gold/30 hover:shadow-[0_8px_24px_rgba(0,0,0,.06)]"
                       >
-                        {/* Left */}
                         <div className="flex items-center gap-4">
                           <div className="hidden sm:flex h-12 w-20 shrink-0 items-center justify-center rounded-lg bg-cream border border-warm overflow-hidden">
                             <svg viewBox="0 0 240 100" className="h-8 w-full opacity-80">
@@ -1035,7 +1202,9 @@ export function DashboardPage() {
                                 {chart.title}
                               </Link>
                               <span className="rounded-full bg-[#eef0e5] px-2.5 py-0.5 text-[11px] font-bold text-[#5f6d53]">
-                                {authEnabled ? "Your Chart" : chart.ownerId ? "Cloud-Ready" : "Local"}
+                                {isOwnedByOther 
+                                  ? `Made by ${chart.ownerLabel ?? "Other User"}` 
+                                  : authEnabled ? "Your Chart" : chart.ownerId ? "Cloud-Ready" : "Local"}
                               </span>
                               {chart.dirty && (
                                 <span className="rounded-full bg-[#fff3d8] px-2.5 py-0.5 text-[11px] font-bold text-[#b8860b] animate-pulse">
@@ -1049,7 +1218,6 @@ export function DashboardPage() {
                           </div>
                         </div>
 
-                        {/* Right */}
                         <div className="mt-4 sm:mt-0 flex items-center gap-2 sm:w-auto w-full">
                           <Link
                             href={`/charts/${chart.id}`}
@@ -1089,6 +1257,63 @@ export function DashboardPage() {
             </div>
           )}
         </div>
+
+          <section className="bg-cream/40 px-6 md:px-12 py-16 md:py-24 border-t border-warm" id="team">
+          <div className="max-w-[1100px] mx-auto text-center">
+            
+
+            <div className="text-center flex flex-col items-center mb-16">
+              <h2 className="font-serif text-[clamp(32px,4vw,52px)] font-extrabold leading-[1.1] tracking-[-0.02em] mb-4">
+                Meet the <em className="italic text-gold font-semibold">Developers</em>
+              </h2>
+              <p className="text-[17px] text-slate leading-[1.65] max-w-[780px]">
+                We are a team of Computer Science students from the <span className="font-semibold text-ink">University of the Philippines Los Baños</span>, bridging technology and genealogy to build a smarter way to connect.
+              </p>
+            </div>
+            
+            {/* Team Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              
+              {/* Project Manager */}
+              <div className="bg-white border border-warm rounded-2xl p-6 shadow-[0_4px_24px_rgba(15,14,13,0.02)] hover:border-gold/30 hover:-translate-y-1 transition-all duration-300 flex flex-col items-center">
+                <div className="w-14 h-14 rounded-full bg-ink text-cream flex items-center justify-center font-sans font-bold text-lg mb-4 shadow-sm">
+                  DE
+                </div>
+                <h3 className="font-sans font-bold text-[17px] text-ink mb-1">Dave Andrie Elcarte</h3>
+                <p className="text-xs font-semibold uppercase tracking-wider text-gold">Project Manager</p>
+              </div>
+
+              {/* Backend */}
+              <div className="bg-white border border-warm rounded-2xl p-6 shadow-[0_4px_24px_rgba(15,14,13,0.02)] hover:border-gold/30 hover:-translate-y-1 transition-all duration-300 flex flex-col items-center">
+                <div className="w-14 h-14 rounded-full bg-ink text-cream flex items-center justify-center font-sans font-bold text-lg mb-4 shadow-sm">
+                  AL
+                </div>
+                <h3 className="font-sans font-bold text-[17px] text-ink mb-1">Angel Laxamana</h3>
+                <p className="text-xs font-semibold uppercase tracking-wider text-gold">Backend Developer</p>
+              </div>
+
+              {/* Frontend 1 */}
+              <div className="bg-white border border-warm rounded-2xl p-6 shadow-[0_4px_24px_rgba(15,14,13,0.02)] hover:border-gold/30 hover:-translate-y-1 transition-all duration-300 flex flex-col items-center">
+                <div className="w-14 h-14 rounded-full bg-ink text-cream flex items-center justify-center font-sans font-bold text-lg mb-4 shadow-sm">
+                  ZM
+                </div>
+                <h3 className="font-sans font-bold text-[17px] text-ink mb-1">Zerine Daphne Maiso</h3>
+                <p className="text-xs font-semibold uppercase tracking-wider text-gold">Frontend Developer</p>
+              </div>
+
+              {/* Frontend 2 */}
+              <div className="bg-white border border-warm rounded-2xl p-6 shadow-[0_4px_24px_rgba(15,14,13,0.02)] hover:border-gold/30 hover:-translate-y-1 transition-all duration-300 flex flex-col items-center">
+                <div className="w-14 h-14 rounded-full bg-ink text-cream flex items-center justify-center font-sans font-bold text-lg mb-4 shadow-sm">
+                  AP
+                </div>
+                <h3 className="font-sans font-bold text-[17px] text-ink mb-1">Arianne Mae Paleracio</h3>
+                <p className="text-xs font-semibold uppercase tracking-wider text-gold">Frontend Developer</p>
+              </div>
+
+            </div>
+          </div>
+        </section>
+
       </section>
     ) : (
       <>
@@ -1399,12 +1624,13 @@ export function DashboardPage() {
           </div>
         </section>
 
-        <footer className="bg-[#080807] text-cream/40 px-6 md:px-12 py-8 md:py-10 text-center flex flex-col items-center">
-          © 2026 Kinnect. All rights reserved.
-        </footer>
+        
       </>
     )}
 
+    <footer className="bg-[#080807] text-cream/40 px-6 md:px-12 py-8 md:py-10 text-center flex flex-col items-center">
+        © 2026 Kinnect. All rights reserved.
+      </footer>
     </main>
   );
 }
