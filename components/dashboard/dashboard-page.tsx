@@ -1408,3 +1408,65 @@ export function DashboardPage() {
     </main>
   );
 }
+
+function DeleteConfirmationModal({
+  busy,
+  chartTitle,
+  error,
+  onCancel,
+  onConfirm,
+}: {
+  busy: boolean;
+  chartTitle: string;
+  error?: string | null;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(24,18,10,0.35)] px-4">
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="delete-chart-title"
+        className="paper-panel w-full max-w-md rounded-[1.75rem] p-6"
+      >
+        <p className="text-sm font-semibold uppercase tracking-[0.22em] text-accent-strong">
+          Delete chart
+        </p>
+        <h2
+          id="delete-chart-title"
+          className="font-display mt-3 text-3xl text-ink"
+        >
+          Delete {chartTitle}?
+        </h2>
+        <p className="mt-3 text-sm leading-7 text-ink-soft">
+          This permanently removes the chart from the cloud and this device. If
+          this chart is shared, it will also be removed for approved members.
+        </p>
+        {error ? (
+          <p className="mt-4 rounded-[1rem] border border-[rgba(153,53,36,0.22)] bg-white/80 px-3 py-2 text-sm leading-6 text-[rgb(153,53,36)]">
+            {error}
+          </p>
+        ) : null}
+        <div className="mt-6 flex flex-wrap justify-end gap-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={busy}
+            className="rounded-full border border-line bg-white px-4 py-2 text-sm font-semibold text-ink transition hover:border-accent/40 disabled:cursor-wait disabled:opacity-70"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={busy}
+            className="rounded-full bg-[rgb(153,53,36)] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[rgb(125,39,25)] disabled:cursor-wait disabled:opacity-70"
+          >
+            {busy ? "Deleting..." : "Delete chart"}
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
