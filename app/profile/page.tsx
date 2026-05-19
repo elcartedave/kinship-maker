@@ -18,9 +18,17 @@ export default async function ProfilePage() {
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-3xl items-center px-5 py-8 sm:px-8">
       <section className="paper-panel w-full rounded-[2rem] p-6 sm:p-10">
-        <p className="text-sm font-semibold uppercase tracking-[0.25em] text-accent-strong">
-          Profile
-        </p>
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-semibold uppercase tracking-[0.25em] text-accent-strong">
+            Profile
+          </p>
+          <a
+            href="/"
+            className="text-xs font-semibold uppercase tracking-[0.22em] text-accent-strong transition hover:text-accent"
+          >
+            Back to dashboard
+          </a>
+        </div>
         <h1 className="font-display mt-3 text-4xl leading-tight text-ink sm:text-5xl">
           Update your details
         </h1>
@@ -31,6 +39,7 @@ export default async function ProfilePage() {
           initialValues={profileInitialValues(user, profile)}
           nextPath="/profile"
           submitLabel="Save profile"
+          email={user.email ?? undefined}
         />
       </section>
     </main>

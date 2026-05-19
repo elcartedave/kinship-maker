@@ -1,10 +1,10 @@
-'use client';
+"use client";
 
-import { Bold, Italic, Trash2 } from 'lucide-react';
+import { Bold, Italic, Trash2 } from "lucide-react";
 
-import { RelationshipGlyph } from '@/components/editor/relationship-glyph';
-import { KinshipSymbolPreview } from '@/components/editor/kinship-symbol-preview';
-import { getTextFontFamilyValue } from '@/components/editor/kinship-text-node';
+import { RelationshipGlyph } from "@/components/editor/relationship-glyph";
+import { KinshipSymbolPreview } from "@/components/editor/kinship-symbol-preview";
+import { getTextFontFamilyValue } from "@/components/editor/kinship-text-node";
 import {
   RELATIONSHIP_TOOLS,
   SYMBOL_LIBRARY,
@@ -13,15 +13,15 @@ import {
   TEXT_FONT_SIZE_MAX,
   TEXT_FONT_SIZE_MIN,
   TEXT_FONT_SIZE_STEP,
-} from '@/lib/kinship/constants';
-import { isSymbolNode, isTextNode } from '@/lib/kinship/symbols';
+} from "@/lib/kinship/constants";
+import { isSymbolNode, isTextNode } from "@/lib/kinship/symbols";
 import type {
   KinshipEdge,
   KinshipRelationshipType,
   KinshipSymbolType,
   KinshipNode,
   KinshipTextNodeData,
-} from '@/lib/kinship/types';
+} from "@/lib/kinship/types";
 
 type InspectorPanelProps = {
   cloudStatus: string;
@@ -68,12 +68,12 @@ export function InspectorPanel(props: InspectorPanelProps) {
           </p>
           <h2 className="font-display mt-2 text-lg text-ink">
             {symbolNode
-              ? 'Selected symbol'
+              ? "Selected symbol"
               : textNode
-                ? 'Selected text'
+                ? "Selected text"
                 : edge
-                  ? 'Selected relationship'
-                  : 'Details'}
+                  ? "Selected relationship"
+                  : "Details"}
           </h2>
         </div>
         {props.onClose ? (
@@ -91,7 +91,10 @@ export function InspectorPanel(props: InspectorPanelProps) {
         {symbolNode ? (
           <>
             <div className="flex items-center gap-3 rounded-[1.2rem] border border-line bg-white/75 px-3 py-3">
-              <KinshipSymbolPreview symbolType={symbolNode.data.symbolType} size={44} />
+              <KinshipSymbolPreview
+                symbolType={symbolNode.data.symbolType}
+                size={44}
+              />
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-accent-strong">
                   Active symbol
@@ -115,7 +118,9 @@ export function InspectorPanel(props: InspectorPanelProps) {
                   onClick={props.onToggleCollapse}
                   className="mt-3 w-full rounded-full border border-line bg-white px-3 py-2.5 text-xs font-semibold uppercase tracking-[0.18em] text-ink transition hover:border-accent"
                 >
-                  {props.isNodeCollapsed ? "Expand descendants" : "Collapse descendants"}
+                  {props.isNodeCollapsed
+                    ? "Expand descendants"
+                    : "Collapse descendants"}
                 </button>
               </div>
             )}
@@ -132,7 +137,9 @@ export function InspectorPanel(props: InspectorPanelProps) {
               <select
                 value={symbolNode.data.symbolType}
                 onChange={(event) =>
-                  props.onNodeSymbolTypeChange(event.target.value as KinshipSymbolType)
+                  props.onNodeSymbolTypeChange(
+                    event.target.value as KinshipSymbolType,
+                  )
                 }
                 className="mt-2 w-full rounded-2xl border border-line bg-white px-4 py-3 text-sm text-ink outline-none transition focus:border-accent"
               >
@@ -146,11 +153,18 @@ export function InspectorPanel(props: InspectorPanelProps) {
 
             <label className="block">
               <span className="text-xs font-semibold uppercase tracking-[0.2em] text-ink-soft">
-                {props.selectedNodeDerivedLabel ? 'Derived label' : 'Visible label'}
+                {props.selectedNodeDerivedLabel
+                  ? "Derived label"
+                  : "Visible label"}
               </span>
               <input
-                value={props.selectedNodeDerivedLabel?.abbreviation ?? symbolNode.data.label}
-                onChange={(event) => props.onNodeLabelChange(event.target.value)}
+                value={
+                  props.selectedNodeDerivedLabel?.abbreviation ??
+                  symbolNode.data.label
+                }
+                onChange={(event) =>
+                  props.onNodeLabelChange(event.target.value)
+                }
                 readOnly={Boolean(props.selectedNodeDerivedLabel)}
                 className="mt-2 w-full rounded-2xl border border-line bg-white px-4 py-3 text-sm text-ink outline-none transition focus:border-accent read-only:cursor-default read-only:border-dashed read-only:bg-white/80"
               />
@@ -164,11 +178,14 @@ export function InspectorPanel(props: InspectorPanelProps) {
                 <p className="mt-1 font-semibold text-emerald-950">
                   {props.selectedNodeDerivedLabel.abbreviation}
                 </p>
-                <p className="mt-1">{props.selectedNodeDerivedLabel.description}</p>
+                <p className="mt-1">
+                  {props.selectedNodeDerivedLabel.description}
+                </p>
               </div>
             ) : (
               <p className="text-xs leading-5 text-ink-soft">
-                This stays editable until the node becomes part of the active Ego family network.
+                This stays editable until the node becomes part of the active
+                Ego family network.
               </p>
             )}
 
@@ -200,7 +217,9 @@ export function InspectorPanel(props: InspectorPanelProps) {
           <>
             <div className="flex items-center gap-3 rounded-[1.2rem] border border-line bg-white/75 px-3 py-3">
               <RelationshipGlyph
-                relationshipType={edge.data?.relationshipType ?? 'descended-from'}
+                relationshipType={
+                  edge.data?.relationshipType ?? "descended-from"
+                }
                 className="h-11 w-11"
               />
               <div>
@@ -223,9 +242,11 @@ export function InspectorPanel(props: InspectorPanelProps) {
                 Relationship type
               </span>
               <select
-                value={edge.data?.relationshipType ?? 'descended-from'}
+                value={edge.data?.relationshipType ?? "descended-from"}
                 onChange={(event) =>
-                  props.onEdgeTypeChange(event.target.value as KinshipRelationshipType)
+                  props.onEdgeTypeChange(
+                    event.target.value as KinshipRelationshipType,
+                  )
                 }
                 className="mt-2 w-full rounded-2xl border border-line bg-white px-4 py-3 text-sm text-ink outline-none transition focus:border-accent"
               >
@@ -242,8 +263,10 @@ export function InspectorPanel(props: InspectorPanelProps) {
                 Optional label
               </span>
               <input
-                value={edge.data?.label ?? ''}
-                onChange={(event) => props.onEdgeLabelChange(event.target.value)}
+                value={edge.data?.label ?? ""}
+                onChange={(event) =>
+                  props.onEdgeLabelChange(event.target.value)
+                }
                 className="mt-2 w-full rounded-2xl border border-line bg-white px-4 py-3 text-sm text-ink outline-none transition focus:border-accent"
               />
             </label>
@@ -373,23 +396,24 @@ function TextInspector({
           className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white"
           style={previewStyle}
         >
-          <span style={{ fontSize: '1.4rem', lineHeight: 1 }}>Aa</span>
+          <span style={{ fontSize: "1.4rem", lineHeight: 1 }}>Aa</span>
         </div>
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-accent-strong">
             Active text
           </p>
-          <p className="text-sm text-ink-soft">Edit the wording, font, color, and size.</p>
+          <p className="text-sm text-ink-soft">
+            Edit the wording, font, color, and size.
+          </p>
         </div>
       </div>
 
-      <DeleteRow
-        label="Delete text"
-        onDelete={onDelete}
-      />
+      <DeleteRow label="Delete text" onDelete={onDelete} />
 
       <label className="block">
-        <span className="text-xs font-semibold uppercase tracking-[0.2em] text-ink-soft">Text</span>
+        <span className="text-xs font-semibold uppercase tracking-[0.2em] text-ink-soft">
+          Text
+        </span>
         <textarea
           value={data.text}
           onChange={(event) => onChange({ text: event.target.value })}
@@ -400,14 +424,20 @@ function TextInspector({
       </label>
 
       <label className="block">
-        <span className="text-xs font-semibold uppercase tracking-[0.2em] text-ink-soft">Font</span>
+        <span className="text-xs font-semibold uppercase tracking-[0.2em] text-ink-soft">
+          Font
+        </span>
         <select
           value={data.fontFamily}
           onChange={(event) => onChange({ fontFamily: event.target.value })}
           className="mt-2 w-full rounded-2xl border border-line bg-white px-4 py-3 text-sm text-ink outline-none transition focus:border-accent"
         >
           {TEXT_FONT_FAMILIES.map((font) => (
-            <option key={font.id} value={font.id} style={{ fontFamily: font.value }}>
+            <option
+              key={font.id}
+              value={font.id}
+              style={{ fontFamily: font.value }}
+            >
               {font.label}
             </option>
           ))}
@@ -419,7 +449,9 @@ function TextInspector({
           <span className="text-xs font-semibold uppercase tracking-[0.2em] text-ink-soft">
             Size
           </span>
-          <span className="text-xs text-ink-soft tabular-nums">{data.fontSize}px</span>
+          <span className="text-xs text-ink-soft tabular-nums">
+            {data.fontSize}px
+          </span>
         </div>
         <div className="mt-2 flex items-center gap-2">
           <input
@@ -428,7 +460,9 @@ function TextInspector({
             max={TEXT_FONT_SIZE_MAX}
             step={TEXT_FONT_SIZE_STEP}
             value={data.fontSize}
-            onChange={(event) => onChange({ fontSize: Number(event.target.value) })}
+            onChange={(event) =>
+              onChange({ fontSize: Number(event.target.value) })
+            }
             className="h-2 flex-1 cursor-pointer accent-[rgb(127,59,12)]"
             aria-label="Font size"
           />
@@ -440,7 +474,11 @@ function TextInspector({
             value={data.fontSize}
             onChange={(event) =>
               onChange({
-                fontSize: clamp(Number(event.target.value), TEXT_FONT_SIZE_MIN, TEXT_FONT_SIZE_MAX),
+                fontSize: clamp(
+                  Number(event.target.value),
+                  TEXT_FONT_SIZE_MIN,
+                  TEXT_FONT_SIZE_MAX,
+                ),
               })
             }
             className="w-16 rounded-xl border border-line bg-white px-2 py-2 text-center text-sm text-ink outline-none focus:border-accent"
@@ -489,17 +527,19 @@ function TextInspector({
         <button
           type="button"
           aria-pressed={data.fontWeight >= 700}
-          onClick={() => onChange({ fontWeight: data.fontWeight >= 700 ? 400 : 700 })}
+          onClick={() =>
+            onChange({ fontWeight: data.fontWeight >= 700 ? 400 : 700 })
+          }
           className="flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-ink transition aria-pressed:border-accent aria-pressed:bg-accent/10 aria-pressed:text-accent-strong"
         >
           <Bold strokeWidth={2.4} className="h-3.5 w-3.5" /> Bold
         </button>
         <button
           type="button"
-          aria-pressed={data.fontStyle === 'italic'}
+          aria-pressed={data.fontStyle === "italic"}
           onClick={() =>
             onChange({
-              fontStyle: data.fontStyle === 'italic' ? 'normal' : 'italic',
+              fontStyle: data.fontStyle === "italic" ? "normal" : "italic",
             })
           }
           className="flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-ink transition aria-pressed:border-accent aria-pressed:bg-accent/10 aria-pressed:text-accent-strong"

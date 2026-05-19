@@ -27,8 +27,29 @@ import {
 } from "@/lib/kinship/local-store";
 import { createSampleChartDocument } from "@/lib/kinship/sample-chart";
 import { isEgoSymbolType, isSymbolNode } from "@/lib/kinship/symbols";
-import type { ChartDocument } from "@/lib/kinship/types";
-import type { ChartRecord } from "@/lib/kinship/types";
+import type { ChartDocument, ChartRecord } from "@/lib/kinship/types";
+import { createBilateralChartDocument } from "@/lib/kinship/bilateral-chart";
+import { createMatrilinealChartDocument } from "@/lib/kinship/matrilineal-chart";
+import { createPatrilinealChartDocument } from "@/lib/kinship/patrilineal-chart";
+
+type TemplateType = "patrilineal" | "matrilineal" | "bilateral";
+
+const CHART_TEMPLATES: { type: TemplateType; label: string }[] = [
+  { type: "patrilineal", label: "Patrilineal chart" },
+  { type: "matrilineal", label: "Matrilineal chart" },
+  { type: "bilateral", label: "Bilateral chart" },
+];
+
+function chartDocumentForTemplate(type: TemplateType): ChartDocument {
+  switch (type) {
+    case "patrilineal":
+      return createPatrilinealChartDocument();
+    case "matrilineal":
+      return createMatrilinealChartDocument();
+    case "bilateral":
+      return createBilateralChartDocument();
+  }
+}
 
 type PendingInvitation = {
   id: string;
@@ -471,6 +492,78 @@ export function DashboardPage() {
     setBusyAction(null);
   }
 
+  async function handleCreateFromTemplate(type: TemplateType) {
+    setFeedback(null);
+		
+    if (!authEnabled) {
+			setBusyAction(type);
+			const document = chartDocumentForTemplate(type);
+      const record = await createChartFromDocument(
+        document.meta.title,
+        document,
+      );
+      router.push(`/charts/${record.id}`);
+      setBusyAction(null);
+      return;
+    }
+
+    if (!user || !supabase) {
+      setFeedback("Sign in with Google to create a chart from this template.");
+      return;
+    }
+
+    setBusyAction(type);
+		const document = chartDocumentForTemplate(type);
+    const egoNodeId = getEgoNodeId(document);
+    const id = crypto.randomUUID();
+    const { data, error } = await supabase
+      .from("charts")
+      .insert({
+        id,
+        user_id: user.id,
+        title: document.meta.title,
+        document,
+        updated_at: document.meta.updatedAt,
+      })
+      .select("id, user_id, title, document, updated_at")
+      .single();
+
+    if (error || !data) {
+      setFeedback(error?.message ?? "Could not create chart from template.");
+      setBusyAction(null);
+      return;
+    }
+
+    if (egoNodeId) {
+      await Promise.all([
+        supabase
+          .from("chart_members")
+          .update({ ego_node_id: egoNodeId })
+          .eq("chart_id", id)
+          .eq("user_id", user.id),
+        supabase.from("kinship_node_user_links").insert({
+          chart_id: id,
+          node_id: egoNodeId,
+          user_id: user.id,
+        }),
+      ]);
+    }
+
+    await saveChartRecord(
+      remoteChartToLocal(
+        data,
+        user.id,
+        egoNodeId ? { ego_node_id: egoNodeId } : undefined,
+      ),
+    );
+    await loadCharts();
+    router.push(`/charts/${id}`);
+    setBusyAction(null);
+  }
+
+  
+  
+
   async function handleDelete(id: string) {
     if (authEnabled && (!user || !supabase)) {
       return;
@@ -541,65 +634,76 @@ export function DashboardPage() {
   return (
     <>
       <main className="mx-auto flex min-h-screen w-full max-w-[1440px] flex-col gap-8 px-5 py-6 sm:px-8 lg:px-10">
-        <section className="paper-panel overflow-hidden rounded-[2rem]">
-          <div className="grid gap-8 p-6 sm:p-8 lg:grid-cols-[1.35fr_0.85fr] lg:p-10">
-            <div className="space-y-5">
-              <p className="text-sm font-semibold uppercase tracking-[0.3em] text-accent-strong">
-                Offline-first kinship chart studio
+      <section className="paper-panel overflow-hidden rounded-[2rem]">
+        <div className="grid gap-8 p-6 sm:p-8 lg:grid-cols-[1.35fr_0.85fr] lg:p-10">
+          <div className="space-y-5">
+            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-accent-strong">
+              Offline-first kinship chart studio
+            </p>
+            <div className="space-y-4">
+              <h1 className="font-display max-w-3xl text-4xl leading-tight text-ink sm:text-5xl lg:text-6xl">
+                {APP_NAME} keeps your charts alive online, offline, and ready to
+                export.
+              </h1>
+              <p className="max-w-2xl text-base leading-8 text-ink-soft sm:text-lg">
+                Drag kinship symbols onto an infinite canvas, connect them with
+                relationship lines, autosave locally, and export exactly around
+                the chart you placed.
               </p>
-              <div className="space-y-4">
-                <h1 className="font-display max-w-3xl text-4xl leading-tight text-ink sm:text-5xl lg:text-6xl">
-                  {APP_NAME} keeps your charts alive online, offline, and ready
-                  to export.
-                </h1>
-                <p className="max-w-2xl text-base leading-8 text-ink-soft sm:text-lg">
-                  Drag kinship symbols onto an infinite canvas, connect them
-                  with relationship lines, autosave locally, and export exactly
-                  around the chart you placed.
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-3">
-                {!authEnabled || user ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => void handleCreateChart()}
-                      disabled={busyAction === "new"}
-                      className="rounded-full bg-accent px-5 py-3 font-semibold text-white transition hover:bg-accent-strong disabled:cursor-wait disabled:opacity-70"
-                    >
-                      {busyAction === "new" ? "Creating..." : "New chart"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void handleCreateSample()}
-                      disabled={busyAction === "sample"}
-                      className="rounded-full border border-line bg-white/70 px-5 py-3 font-semibold text-ink transition hover:border-accent/40 hover:bg-white"
-                    >
-                      {busyAction === "sample"
-                        ? "Loading sample..."
-                        : "Load sample chart"}
-                    </button>
-                  </>
-                ) : (
-                  <p className="max-w-md rounded-2xl border border-line bg-white/70 px-4 py-3 text-sm leading-6 text-ink-soft">
-                    Sign in with Google (in the cloud panel) to create a new
-                    chart or open the sample diagram.
-                  </p>
-                )}
-                <InstallButton className="rounded-full border border-line bg-white/70 px-5 py-3 font-semibold text-ink transition hover:border-accent/40 hover:bg-white" />
-              </div>
-              <div className="flex flex-wrap items-center gap-3 text-sm text-ink-soft">
-                <span className="rounded-full bg-white/80 px-3 py-1">
-                  Infinite canvas
-                </span>
-                <span className="rounded-full bg-white/80 px-3 py-1">
-                  Cropped PNG and PDF
-                </span>
-                <span className="rounded-full bg-white/80 px-3 py-1">
-                  Local autosave
-                </span>
-              </div>
             </div>
+            <div className="flex flex-wrap gap-3">
+              {(!authEnabled || user) ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => void handleCreateChart()}
+                    disabled={busyAction === "new"}
+                    className="rounded-full bg-accent px-5 py-3 font-semibold text-white transition hover:bg-accent-strong disabled:cursor-wait disabled:opacity-70"
+                  >
+                    {busyAction === "new" ? "Creating..." : "New chart"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleCreateSample()}
+                    disabled={busyAction === "sample"}
+                    className="rounded-full border border-line bg-white/70 px-5 py-3 font-semibold text-ink transition hover:border-accent/40 hover:bg-white"
+                  >
+                    {busyAction === "sample"
+                      ? "Loading sample..."
+                      : "Load sample chart"}
+                  </button>
+                  {CHART_TEMPLATES.map(({ type, label }) => (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => void handleCreateFromTemplate(type)}
+                      disabled={busyAction === type}
+                      className="rounded-full border border-line bg-white/70 px-5 py-3 font-semibold text-ink transition hover:border-accent/40 hover:bg-white disabled:cursor-wait disabled:opacity-70"
+                    >
+                      {busyAction === type ? "Creating..." : label}
+                    </button>
+                  ))}
+                </>
+              ) : (
+                <p className="max-w-md rounded-2xl border border-line bg-white/70 px-4 py-3 text-sm leading-6 text-ink-soft">
+                  Sign in with Google (in the cloud panel) to create a new chart
+                  or open the sample diagram.
+                </p>
+              )}
+              <InstallButton className="rounded-full border border-line bg-white/70 px-5 py-3 font-semibold text-ink transition hover:border-accent/40 hover:bg-white" />
+            </div>
+            <div className="flex flex-wrap items-center gap-3 text-sm text-ink-soft">
+              <span className="rounded-full bg-white/80 px-3 py-1">
+                Infinite canvas
+              </span>
+              <span className="rounded-full bg-white/80 px-3 py-1">
+                Cropped PNG and PDF
+              </span>
+              <span className="rounded-full bg-white/80 px-3 py-1">
+                Local autosave
+              </span>
+            </div>
+          </div>
 
             <aside className="paper-grid rounded-[1.75rem] border border-line/80 bg-panel-strong/90 p-5 sm:p-6">
               <div className="space-y-5">
@@ -630,6 +734,12 @@ export function DashboardPage() {
                         >
                           Sync now
                         </button>
+                        <Link
+                          href="/profile"
+                          className="rounded-full border border-line px-4 py-2 text-sm font-semibold text-ink transition hover:border-accent/40 hover:bg-white"
+                        >
+                          Profile
+                        </Link>
                         <button
                           type="button"
                           onClick={() => void signOut()}

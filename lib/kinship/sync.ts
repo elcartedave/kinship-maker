@@ -44,9 +44,7 @@ export function decideSyncAction(
   const localChangedAfterSync = local.dirty || localUpdatedAt > lastSyncedAt;
   const remoteChangedAfterSync = remoteUpdatedAt > lastSyncedAt;
 
-  if (localChangedAfterSync && remoteChangedAfterSync) {
-    return "conflict" as const;
-  }
+  // Conflict copies are disabled. Last Write Wins applies via the conditions below.
 
   if (localChangedAfterSync && localUpdatedAt >= remoteUpdatedAt) {
     return "push" as const;

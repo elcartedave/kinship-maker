@@ -46,7 +46,7 @@ describe("sync decisions", () => {
     expect(decideSyncAction(local, remote)).toBe("pull");
   });
 
-  test("flags concurrent local and remote edits as conflicts", () => {
+  test("resolves concurrent edits using Last Write Wins (pulls if remote is newer)", () => {
     const local = createChartRecord("Local");
     local.lastSyncedAt = "2026-05-08T00:00:00.000Z";
     local.updatedAt = "2026-05-08T01:00:00.000Z";
@@ -57,6 +57,6 @@ describe("sync decisions", () => {
       updated_at: "2026-05-08T01:15:00.000Z",
     });
 
-    expect(decideSyncAction(local, remote)).toBe("conflict");
+    expect(decideSyncAction(local, remote)).toBe("pull");
   });
 });

@@ -267,14 +267,14 @@ function collectSubtree(
     if (!current) {
       continue;
     }
-    
+
     // For the root itself, we add its partners and children, but NOT the root to the hidden list.
     // For others, we add them to visited.
     // Wait, the logic is simpler if we just traverse and at the end remove rootId.
     if (current !== rootId) {
       visited.add(current);
     }
-    
+
     const children = childrenByParent.get(current);
     if (children) {
       for (const child of children) {
@@ -284,7 +284,7 @@ function collectSubtree(
         }
       }
     }
-    
+
     const partners = partnersByNode.get(current);
     if (partners) {
       for (const partner of partners) {
@@ -330,7 +330,7 @@ function mostCommonSurname(nodes: KinshipNode[]) {
     }
   }
 
-      return best;
+  return best;
 }
 
 function isValidConnectionForTool(
@@ -573,8 +573,6 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
     );
   }, [chartOwnerId, egoNodeId, nodeUserLinks, nodes, user]);
 
-
-
   const collapseState = useMemo(() => {
     if (collapsedRoots.size === 0) {
       return {
@@ -584,7 +582,7 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
 
     const { childrenByParent } = buildLineageIndex(nodes, edges);
     const { partnersByNode } = buildPartnerIndex(nodes, edges);
-    
+
     const hiddenNodeIds = new Set<string>();
 
     for (const rootId of collapsedRoots) {
@@ -593,7 +591,11 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
         continue;
       }
 
-      const subtreeHidden = collectSubtree(rootId, childrenByParent, partnersByNode);
+      const subtreeHidden = collectSubtree(
+        rootId,
+        childrenByParent,
+        partnersByNode,
+      );
       for (const id of subtreeHidden) {
         hiddenNodeIds.add(id);
       }
@@ -615,13 +617,16 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
         egoSexAssignedAtBirth,
       );
 
-      const baseNode = symbolType === node.data.symbolType ? node : {
-        ...node,
-        data: {
-          ...node.data,
-          symbolType,
-        },
-      };
+      const baseNode =
+        symbolType === node.data.symbolType
+          ? node
+          : {
+              ...node,
+              data: {
+                ...node.data,
+                symbolType,
+              },
+            };
 
       if (collapseState.hiddenNodeIds.has(node.id)) {
         return { ...baseNode, hidden: true };
@@ -639,7 +644,13 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
 
       return baseNode;
     });
-  }, [collapseState, collapsedRoots, currentUserLinkedNodeId, egoSexAssignedAtBirth, nodes]);
+  }, [
+    collapseState,
+    collapsedRoots,
+    currentUserLinkedNodeId,
+    egoSexAssignedAtBirth,
+    nodes,
+  ]);
 
   const displayEdges = useMemo(() => {
     if (collapseState.hiddenNodeIds.size === 0) {
@@ -1583,12 +1594,33 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
       const normalizedEmail = email.trim().toLowerCase();
       const { data: invitee, error: lookupError } = await supabase
         .from("users")
-        .select("id, email")
+        .select("id, email, sex_assigned_at_birth")
         .ilike("email", normalizedEmail)
         .maybeSingle();
 
       if (lookupError || !invitee) {
         setInviteFeedback("No user profile was found for that email.");
+        setInvitePending(false);
+        return;
+      }
+
+      if (!invitee.sex_assigned_at_birth) {
+        setInviteFeedback("The invited user must complete their profile (including sex assigned at birth) before they can be linked.");
+        setInvitePending(false);
+        return;
+      }
+
+      const inviteeSex = String(invitee.sex_assigned_at_birth).toLowerCase().trim();
+      const isMaleNode = isMaleSymbolType(target.data.symbolType);
+      
+      if (isMaleNode && inviteeSex === "female") {
+        setInviteFeedback("Cannot link a female user to a male node.");
+        setInvitePending(false);
+        return;
+      }
+      
+      if (!isMaleNode && inviteeSex === "male") {
+        setInviteFeedback("Cannot link a male user to a female node.");
         setInvitePending(false);
         return;
       }
@@ -1872,7 +1904,12 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
                 onNodesChange={(changes) => {
                   const editableIds = new Set(nodes.map((node) => node.id));
                   const safeChanges = changes.filter((change) => {
-                    const changeId = "id" in change ? change.id : "item" in change ? change.item.id : null;
+                    const changeId =
+                      "id" in change
+                        ? change.id
+                        : "item" in change
+                          ? change.item.id
+                          : null;
                     return changeId ? editableIds.has(changeId) : true;
                   });
                   if (safeChanges.some((c) => c.type === "remove")) {
@@ -2011,9 +2048,11 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
         <aside className="kinship-floating-panel fixed right-3 top-[76px] z-40 hidden max-h-[calc(100vh-100px)] w-64 overflow-auto rounded-[1.2rem] p-2.5 lg:block">
           <InspectorPanel
             cloudStatus={cloudStatus}
-            isNodeCollapsed={selectedNodeId ? collapsedRoots.has(selectedNodeId) : false}
+            isNodeCollapsed={
+              selectedNodeId ? collapsedRoots.has(selectedNodeId) : false
+            }
             onToggleCollapse={
-              selectedNodeId
+              selectedNodeId && edges.some((e) => e.target === selectedNodeId && e.type === "descended-from")
                 ? () => {
                     setCollapsedRoots((current) => {
                       const next = new Set(current);
@@ -2363,9 +2402,11 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
             <div className="paper-panel mx-auto mt-auto h-[78vh] w-[min(28rem,calc(100vw-1.5rem))] rounded-[1.75rem] p-5">
               <InspectorPanel
                 cloudStatus={cloudStatus}
-                isNodeCollapsed={selectedNodeId ? collapsedRoots.has(selectedNodeId) : false}
+                isNodeCollapsed={
+                  selectedNodeId ? collapsedRoots.has(selectedNodeId) : false
+                }
                 onToggleCollapse={
-                  selectedNodeId
+                  selectedNodeId && edges.some((e) => e.target === selectedNodeId && e.type === "descended-from")
                     ? () => {
                         setCollapsedRoots((current) => {
                           const next = new Set(current);

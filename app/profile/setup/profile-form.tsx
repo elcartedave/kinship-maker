@@ -12,6 +12,7 @@ type ProfileFormProps = {
   initialValues: ProfileSetupInitialValues;
   nextPath: string;
   submitLabel?: string;
+  email?: string;
 };
 
 function FieldError({ messages }: { messages?: string[] }) {
@@ -26,6 +27,7 @@ export function ProfileForm({
   initialValues,
   nextPath,
   submitLabel = "Continue",
+  email,
 }: ProfileFormProps) {
   const initialState: ProfileFormState = {
     values: initialValues,
@@ -41,6 +43,20 @@ export function ProfileForm({
         <p className="rounded-[1.25rem] border border-[rgba(153,53,36,0.22)] bg-white/75 px-4 py-3 text-sm leading-6 text-[rgb(153,53,36)]">
           {state.errors.form[0]}
         </p>
+      ) : null}
+
+      {email ? (
+        <label className="block">
+          <span className="text-xs font-semibold uppercase tracking-[0.2em] text-ink-soft">
+            Email address
+          </span>
+          <input
+            type="email"
+            value={email}
+            disabled
+            className="mt-2 w-full rounded-2xl border border-line bg-panel-strong px-4 py-3 text-sm text-ink-soft outline-none opacity-80 cursor-not-allowed"
+          />
+        </label>
       ) : null}
 
       <div className="grid gap-4 sm:grid-cols-2">
