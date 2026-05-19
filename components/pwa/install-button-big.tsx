@@ -7,7 +7,7 @@ type BeforeInstallPromptEvent = Event & {
   userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
 };
 
-export function InstallButton({ className = "" }: { className?: string }) {
+export function InstallButtonBig({ className = "" }: { className?: string }) {
   const [installEvent, setInstallEvent] =
     useState<BeforeInstallPromptEvent | null>(null);
   const [isIos] = useState(() =>
@@ -42,6 +42,7 @@ export function InstallButton({ className = "" }: { className?: string }) {
     return null;
   }
 
+  // STANDARD INSTALLATION MODE
   if (installEvent) {
     return (
       <button
@@ -53,18 +54,40 @@ export function InstallButton({ className = "" }: { className?: string }) {
         }}
         className={className}
       >
-        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
-        Install app
+        {/* Icon Container (Matches exactly 14x14 grid bounding box) */}
+        <div className="mb-2 flex h-9 w-9 shrink-0 items-center justify-center">
+          <svg
+            width="26"
+            height="26"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            className="text-gold transition-transform group-hover:scale-105"
+          >
+            <path d="M12 5v14M5 12l7 7 7-7" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </div>
+        {/* Text block matching the identical alignment properties */}
+        <span className="text-[14px] font-bold tracking-tight text-center px-1 h-[20px] flex items-center justify-center">
+          Install App
+        </span>
       </button>
     );
   }
 
+  // IOS FALLBACK INSTALLED SCREEN WRAPPED TO LOOK LIKE THE CHIPS
   if (isIos) {
     return (
-      <p className={className}>
-        Install on iPhone or iPad from the Share menu, then choose Add to Home
-        Screen.
-      </p>
+      <div className={`${className} px-4 !justify-start pt-6 select-none`}>
+        {/* Sub-label info node header */}
+        <span className="text-[10px] font-bold uppercase tracking-wider text-gold mb-1">
+          iOS Installation
+        </span>
+        <p className="text-[13px] font-medium leading-snug text-ink/70 text-center">
+          Tap the <span className="font-bold text-ink">Share</span> menu button, then select <span className="font-bold text-ink">Add to Home Screen</span>.
+        </p>
+      </div>
     );
   }
 
