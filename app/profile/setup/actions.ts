@@ -37,7 +37,7 @@ const ProfileFormSchema = z.object({
     .min(1, "Age must be at least 1.")
     .max(130, "Age must be 130 or below."),
   sexAssignedAtBirth: z.enum(["male", "female"], {
-    required_error: "Sex assigned at birth is required.",
+    error: "Sex assigned at birth is required.",
   }),
   nextPath: z.string().optional(),
 });

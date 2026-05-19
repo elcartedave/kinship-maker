@@ -2,10 +2,12 @@ import type { Edge, Node, Viewport } from "@xyflow/react";
 
 export const KINSHIP_NODE_TYPE = "kinshipSymbol" as const;
 export const KINSHIP_TEXT_NODE_TYPE = "kinshipText" as const;
+export const KINSHIP_CLUSTER_NODE_TYPE = "kinshipCluster" as const;
 
 export const KINSHIP_NODE_TYPES = [
   KINSHIP_NODE_TYPE,
   KINSHIP_TEXT_NODE_TYPE,
+  KINSHIP_CLUSTER_NODE_TYPE,
 ] as const;
 
 export const KINSHIP_SYMBOL_TYPES = [
@@ -39,6 +41,7 @@ export type KinshipNodeData = {
   symbolType: KinshipSymbolType;
   label: string;
   notes?: string;
+  isCollapsedBranchRoot?: boolean;
 };
 
 /**
@@ -67,6 +70,13 @@ export type KinshipTextNodeData = {
   rotation?: number;
 };
 
+export type KinshipClusterNodeData = {
+  label: string;
+  count: number;
+  surname: string | null;
+  rootId: string;
+};
+
 export type KinshipEdgeData = {
   relationshipType: KinshipRelationshipType;
   label?: string;
@@ -77,6 +87,10 @@ export type KinshipTextNode = Node<
   KinshipTextNodeData,
   typeof KINSHIP_TEXT_NODE_TYPE
 >;
+export type KinshipClusterNode = Node<
+  KinshipClusterNodeData,
+  typeof KINSHIP_CLUSTER_NODE_TYPE
+>;
 
 /**
  * Union of every node kind that the kinship canvas can hold. Use the
@@ -84,7 +98,10 @@ export type KinshipTextNode = Node<
  * to narrow before reading kind-specific fields like `data.symbolType` or
  * `data.fontFamily`.
  */
-export type KinshipNode = KinshipSymbolNode | KinshipTextNode;
+export type KinshipNode =
+  | KinshipSymbolNode
+  | KinshipTextNode
+  | KinshipClusterNode;
 
 export type KinshipEdge = Edge<KinshipEdgeData, KinshipRelationshipType>;
 

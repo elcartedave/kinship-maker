@@ -9,7 +9,7 @@ export const AI_PARTNER_RELATIONSHIP_TYPES = [
   "divorced",
   "separated",
   "fictive",
-] as const satisfies readonly KinshipRelationshipType[];
+] as const;
 
 export type AiPartnerRelationshipType =
   (typeof AI_PARTNER_RELATIONSHIP_TYPES)[number];

@@ -43,13 +43,21 @@ export function KinshipNode(props: NodeProps<KinshipSymbolNode>) {
       />
 
       <div
-        className="flex h-full w-full flex-col items-center justify-center gap-px rounded-[1.4rem] px-2"
+        className="flex h-full w-full flex-col items-center justify-center gap-px rounded-[1.4rem] px-2 relative"
         style={{ minHeight: NODE_SHAPE_SIZE }}
       >
         <KinshipSymbolPreview
           symbolType={props.data.symbolType}
           className="block shrink-0 -mb-1.5"
         />
+        {props.data.isCollapsedBranchRoot && (
+          <div
+            className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-accent text-white shadow-sm ring-2 ring-white"
+            title="This branch has hidden descendants"
+          >
+            <span className="mb-0.5 text-xs font-bold tracking-tight">...</span>
+          </div>
+        )}
         <input
           aria-label={`Label for ${props.data.symbolType}`}
           aria-readonly={labelState.isAutoDerived}

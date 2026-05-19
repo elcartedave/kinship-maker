@@ -28,6 +28,7 @@ import {
 import { AiGeneratePanel } from "@/components/editor/ai-generate-panel";
 import { InspectorPanel } from "@/components/editor/inspector-panel";
 import { KinshipEditorProvider } from "@/components/editor/kinship-editor-context";
+import { KinshipClusterNode } from "@/components/editor/kinship-cluster-node";
 import { KinshipNode as KinshipNodeComponent } from "@/components/editor/kinship-node";
 import { KinshipTextNode as KinshipTextNodeComponent } from "@/components/editor/kinship-text-node";
 import { RelationshipConnectionLine } from "@/components/editor/relationship-connection-line";
@@ -98,6 +99,7 @@ import type {
   KinshipSymbolType,
   KinshipTextNodeData,
 } from "@/lib/kinship/types";
+import { KINSHIP_CLUSTER_NODE_TYPE } from "@/lib/kinship/types";
 import {
   Hand,
   MousePointer2,
@@ -175,6 +177,7 @@ function symbolTypeForCurrentEgo(
 const nodeTypes = {
   kinshipSymbol: KinshipNodeComponent,
   kinshipText: KinshipTextNodeComponent,
+  kinshipCluster: KinshipClusterNode,
 };
 
 const edgeTypes = {
@@ -192,6 +195,142 @@ function formatSaveStamp(value: string) {
     minute: "2-digit",
     second: "2-digit",
   }).format(new Date(value));
+}
+
+function buildLineageIndex(nodes: KinshipNode[], edges: KinshipEdge[]) {
+  const symbolIds = new Set(
+    nodes.filter((node) => isSymbolNode(node)).map((node) => node.id),
+  );
+  const parentsByChild = new Map<string, Set<string>>();
+  const childrenByParent = new Map<string, Set<string>>();
+
+  for (const edge of edges) {
+    if (edge.data?.relationshipType !== "descended-from") {
+      continue;
+    }
+    if (!symbolIds.has(edge.source) || !symbolIds.has(edge.target)) {
+      continue;
+    }
+
+    if (!parentsByChild.has(edge.target)) {
+      parentsByChild.set(edge.target, new Set());
+    }
+    parentsByChild.get(edge.target)?.add(edge.source);
+
+    if (!childrenByParent.has(edge.source)) {
+      childrenByParent.set(edge.source, new Set());
+    }
+    childrenByParent.get(edge.source)?.add(edge.target);
+  }
+
+  return { parentsByChild, childrenByParent };
+}
+
+function buildPartnerIndex(nodes: KinshipNode[], edges: KinshipEdge[]) {
+  const symbolIds = new Set(
+    nodes.filter((node) => isSymbolNode(node)).map((node) => node.id),
+  );
+  const partnersByNode = new Map<string, Set<string>>();
+
+  for (const edge of edges) {
+    if (edge.data?.relationshipType === "descended-from") {
+      continue;
+    }
+    if (!symbolIds.has(edge.source) || !symbolIds.has(edge.target)) {
+      continue;
+    }
+
+    if (!partnersByNode.has(edge.source)) {
+      partnersByNode.set(edge.source, new Set());
+    }
+    partnersByNode.get(edge.source)?.add(edge.target);
+
+    if (!partnersByNode.has(edge.target)) {
+      partnersByNode.set(edge.target, new Set());
+    }
+    partnersByNode.get(edge.target)?.add(edge.source);
+  }
+
+  return { partnersByNode };
+}
+
+function collectSubtree(
+  rootId: string,
+  childrenByParent: Map<string, Set<string>>,
+  partnersByNode: Map<string, Set<string>>,
+) {
+  const visited = new Set<string>();
+  const queue = [rootId];
+
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (!current) {
+      continue;
+    }
+    
+    // For the root itself, we add its partners and children, but NOT the root to the hidden list.
+    // For others, we add them to visited.
+    // Wait, the logic is simpler if we just traverse and at the end remove rootId.
+    if (current !== rootId) {
+      visited.add(current);
+    }
+    
+    const children = childrenByParent.get(current);
+    if (children) {
+      for (const child of children) {
+        if (!visited.has(child) && child !== rootId) {
+          visited.add(child);
+          queue.push(child);
+        }
+      }
+    }
+    
+    const partners = partnersByNode.get(current);
+    if (partners) {
+      for (const partner of partners) {
+        if (!visited.has(partner) && partner !== rootId) {
+          visited.add(partner);
+          queue.push(partner);
+        }
+      }
+    }
+  }
+
+  return visited;
+}
+
+function mostCommonSurname(nodes: KinshipNode[]) {
+  const counts = new Map<string, number>();
+
+  for (const node of nodes) {
+    if (!isSymbolNode(node)) {
+      continue;
+    }
+    const label = node.data.label?.trim();
+    if (!label) {
+      continue;
+    }
+    const parts = label.split(/\s+/).filter(Boolean);
+    if (parts.length === 0) {
+      continue;
+    }
+    const surname = parts[parts.length - 1];
+    if (surname.length < 2) {
+      continue;
+    }
+    counts.set(surname, (counts.get(surname) ?? 0) + 1);
+  }
+
+  let best: string | null = null;
+  let bestCount = 0;
+  for (const [surname, count] of counts) {
+    if (count > bestCount) {
+      best = surname;
+      bestCount = count;
+    }
+  }
+
+      return best;
 }
 
 function isValidConnectionForTool(
@@ -322,6 +461,10 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
   const [egoSexAssignedAtBirth, setEgoSexAssignedAtBirth] = useState<
     "female" | "male" | null
   >(null);
+  const [collapseMode, setCollapseMode] = useState(false);
+  const [collapsedRoots, setCollapsedRoots] = useState<Set<string>>(
+    () => new Set(),
+  );
 
   const chartStateRef = useRef({
     nodes: [] as KinshipNode[],
@@ -430,34 +573,89 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
     );
   }, [chartOwnerId, egoNodeId, nodeUserLinks, nodes, user]);
 
-  const displayNodes = useMemo<KinshipNode[]>(
-    () =>
-      nodes.map((node) => {
-        if (!isSymbolNode(node)) {
-          return node;
-        }
 
-        const symbolType = symbolTypeForCurrentEgo(
-          node.data.symbolType,
-          node.id,
-          currentUserLinkedNodeId,
-          egoSexAssignedAtBirth,
-        );
 
-        if (symbolType === node.data.symbolType) {
-          return node;
-        }
+  const collapseState = useMemo(() => {
+    if (collapsedRoots.size === 0) {
+      return {
+        hiddenNodeIds: new Set<string>(),
+      };
+    }
 
+    const { childrenByParent } = buildLineageIndex(nodes, edges);
+    const { partnersByNode } = buildPartnerIndex(nodes, edges);
+    
+    const hiddenNodeIds = new Set<string>();
+
+    for (const rootId of collapsedRoots) {
+      const rootNode = nodes.find((node) => node.id === rootId);
+      if (!rootNode || !isSymbolNode(rootNode)) {
+        continue;
+      }
+
+      const subtreeHidden = collectSubtree(rootId, childrenByParent, partnersByNode);
+      for (const id of subtreeHidden) {
+        hiddenNodeIds.add(id);
+      }
+    }
+
+    return { hiddenNodeIds };
+  }, [collapsedRoots, edges, nodes]);
+
+  const displayNodes = useMemo<KinshipNode[]>(() => {
+    return nodes.map((node) => {
+      if (!isSymbolNode(node)) {
+        return node;
+      }
+
+      const symbolType = symbolTypeForCurrentEgo(
+        node.data.symbolType,
+        node.id,
+        currentUserLinkedNodeId,
+        egoSexAssignedAtBirth,
+      );
+
+      const baseNode = symbolType === node.data.symbolType ? node : {
+        ...node,
+        data: {
+          ...node.data,
+          symbolType,
+        },
+      };
+
+      if (collapseState.hiddenNodeIds.has(node.id)) {
+        return { ...baseNode, hidden: true };
+      }
+
+      if (collapsedRoots.has(node.id)) {
         return {
-          ...node,
+          ...baseNode,
           data: {
-            ...node.data,
-            symbolType,
+            ...baseNode.data,
+            isCollapsedBranchRoot: true,
           },
         };
-      }),
-    [currentUserLinkedNodeId, egoSexAssignedAtBirth, nodes],
-  );
+      }
+
+      return baseNode;
+    });
+  }, [collapseState, collapsedRoots, currentUserLinkedNodeId, egoSexAssignedAtBirth, nodes]);
+
+  const displayEdges = useMemo(() => {
+    if (collapseState.hiddenNodeIds.size === 0) {
+      return edges;
+    }
+
+    return edges.map((edge) => {
+      if (
+        collapseState.hiddenNodeIds.has(edge.source) ||
+        collapseState.hiddenNodeIds.has(edge.target)
+      ) {
+        return { ...edge, hidden: true };
+      }
+      return edge;
+    });
+  }, [collapseState, edges]);
   const selectedDisplayNode = useMemo(
     () => displayNodes.find((node) => node.id === selectedNodeId) ?? null,
     [displayNodes, selectedNodeId],
@@ -618,7 +816,7 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
 
     startTransition(() =>
       setNodeUserLinks(
-        data.map((link) => ({
+        data.map((link: any) => ({
           node_id: link.node_id,
           user_id: link.user_id,
           label: link.label ?? "Linked user",
@@ -1593,7 +1791,7 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
                 }`}
                 style={{ width: "100%", height: "100%" }}
                 nodes={displayNodes}
-                edges={edges}
+                edges={displayEdges}
                 nodeTypes={nodeTypes}
                 edgeTypes={edgeTypes}
                 connectionLineComponent={connectionLineComponent}
@@ -1672,10 +1870,15 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
                   setSelectedNodeIds([]);
                 }}
                 onNodesChange={(changes) => {
-                  if (changes.some((c) => c.type === "remove")) {
+                  const editableIds = new Set(nodes.map((node) => node.id));
+                  const safeChanges = changes.filter((change) => {
+                    const changeId = "id" in change ? change.id : "item" in change ? change.item.id : null;
+                    return changeId ? editableIds.has(changeId) : true;
+                  });
+                  if (safeChanges.some((c) => c.type === "remove")) {
                     commitBeforeChange();
                   }
-                  setNodes((current) => applyNodeChanges(changes, current));
+                  setNodes((current) => applyNodeChanges(safeChanges, current));
                 }}
                 onEdgesChange={(changes) => {
                   if (changes.some((c) => c.type === "remove")) {
@@ -1683,9 +1886,20 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
                   }
                   setEdges((current) => applyEdgeChanges(changes, current));
                 }}
-                onNodeClick={(event) => {
+                onNodeClick={(event, node) => {
                   const target = event.target as HTMLElement | null;
                   if (target?.closest(".react-flow__handle")) {
+                    return;
+                  }
+                  if (node.id.startsWith("cluster:")) {
+                    const rootId = node.id.replace("cluster:", "");
+                    setCollapsedRoots((current) => {
+                      const next = new Set(current);
+                      next.delete(rootId);
+                      return next;
+                    });
+                    setSelectedNodeIds([]);
+                    setSelectedEdgeIds([]);
                     return;
                   }
                   setCurrentTool((tool) => (tool !== null ? null : tool));
@@ -1797,6 +2011,22 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
         <aside className="kinship-floating-panel fixed right-3 top-[76px] z-40 hidden max-h-[calc(100vh-100px)] w-64 overflow-auto rounded-[1.2rem] p-2.5 lg:block">
           <InspectorPanel
             cloudStatus={cloudStatus}
+            isNodeCollapsed={selectedNodeId ? collapsedRoots.has(selectedNodeId) : false}
+            onToggleCollapse={
+              selectedNodeId
+                ? () => {
+                    setCollapsedRoots((current) => {
+                      const next = new Set(current);
+                      if (next.has(selectedNodeId)) {
+                        next.delete(selectedNodeId);
+                      } else {
+                        next.add(selectedNodeId);
+                      }
+                      return next;
+                    });
+                  }
+                : undefined
+            }
             currentTool={currentTool}
             canManageLinkedUser={canManageNodeLinks}
             inviteFeedback={inviteFeedback}
@@ -2133,6 +2363,22 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
             <div className="paper-panel mx-auto mt-auto h-[78vh] w-[min(28rem,calc(100vw-1.5rem))] rounded-[1.75rem] p-5">
               <InspectorPanel
                 cloudStatus={cloudStatus}
+                isNodeCollapsed={selectedNodeId ? collapsedRoots.has(selectedNodeId) : false}
+                onToggleCollapse={
+                  selectedNodeId
+                    ? () => {
+                        setCollapsedRoots((current) => {
+                          const next = new Set(current);
+                          if (next.has(selectedNodeId)) {
+                            next.delete(selectedNodeId);
+                          } else {
+                            next.add(selectedNodeId);
+                          }
+                          return next;
+                        });
+                      }
+                    : undefined
+                }
                 currentTool={currentTool}
                 canManageLinkedUser={canManageNodeLinks}
                 inviteFeedback={inviteFeedback}

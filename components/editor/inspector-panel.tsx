@@ -25,6 +25,7 @@ import type {
 
 type InspectorPanelProps = {
   cloudStatus: string;
+  isNodeCollapsed?: boolean;
   currentTool: KinshipRelationshipType | null;
   inviteFeedback?: string | null;
   invitePending?: boolean;
@@ -34,6 +35,7 @@ type InspectorPanelProps = {
   localStatus: string;
   onDeleteSelection?: () => void;
   onClose?: () => void;
+  onToggleCollapse?: () => void;
   onEdgeLabelChange: (value: string) => void;
   onEdgeTypeChange: (value: KinshipRelationshipType) => void;
   onNodeLabelChange: (value: string) => void;
@@ -99,6 +101,24 @@ export function InspectorPanel(props: InspectorPanelProps) {
                 </p>
               </div>
             </div>
+
+            {props.onToggleCollapse && (
+              <div className="rounded-[1.25rem] border border-line bg-white/75 px-3 py-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-accent-strong">
+                  Branch visibility
+                </p>
+                <p className="mt-1 text-xs text-ink-soft">
+                  Collapse partners and descendants to simplify the view.
+                </p>
+                <button
+                  type="button"
+                  onClick={props.onToggleCollapse}
+                  className="mt-3 w-full rounded-full border border-line bg-white px-3 py-2.5 text-xs font-semibold uppercase tracking-[0.18em] text-ink transition hover:border-accent"
+                >
+                  {props.isNodeCollapsed ? "Expand descendants" : "Collapse descendants"}
+                </button>
+              </div>
+            )}
 
             <DeleteRow
               label="Delete symbol"
