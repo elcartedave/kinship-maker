@@ -1,9 +1,14 @@
 import type { Metadata, Viewport } from "next";
 import { Fraunces, Manrope, DM_Sans, Playfair_Display } from "next/font/google";
 
-import { APP_DESCRIPTION, APP_NAME, PAPER_BACKGROUND } from "@/lib/kinship/constants";
+import {
+  APP_DESCRIPTION,
+  APP_NAME,
+  PAPER_BACKGROUND,
+} from "@/lib/kinship/constants";
 import { AppShellProvider } from "@/components/providers/app-shell";
 import { ServiceWorkerRegistration } from "@/components/pwa/service-worker-registration";
+import { Toaster } from "sonner";
 import "./globals.css";
 
 const displayFont = Fraunces({
@@ -56,6 +61,7 @@ export default function RootLayout({
       <body className="min-h-full">
         <AppShellProvider>
           <ServiceWorkerRegistration />
+          <Toaster position="bottom-right" theme="light" invert closeButton />
           {children}
         </AppShellProvider>
       </body>

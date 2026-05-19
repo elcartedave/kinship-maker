@@ -68,6 +68,10 @@ function safeNextPath(raw: FormDataEntryValue | null) {
   return raw;
 }
 
+function addToastQuery(path: string, toast: string) {
+  return `${path}${path.includes("?") ? "&" : "?"}toast=${encodeURIComponent(toast)}`;
+}
+
 export async function saveProfile(
   _state: ProfileFormState,
   formData: FormData,
@@ -145,5 +149,5 @@ export async function saveProfile(
     };
   }
 
-  redirect(parsed.data.nextPath ?? "/");
+  redirect(addToastQuery(parsed.data.nextPath ?? "/", "profile-saved"));
 }

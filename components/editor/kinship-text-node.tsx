@@ -179,9 +179,11 @@ export function KinshipTextNode(props: NodeProps<KinshipTextNodeType>) {
         minHeight={TEXT_NODE_MIN_HEIGHT}
         keepAspectRatio={false}
         color="rgba(127, 59, 12, 0.88)"
+        handleClassName="kinship-text-resizer-handle"
+        lineClassName="kinship-text-resizer-line"
         handleStyle={{
-          width: 9,
-          height: 9,
+          width: 12,
+          height: 12,
           borderRadius: "50%",
           border: "1.5px solid white",
           background: "rgba(127, 59, 12, 0.92)",
@@ -236,7 +238,10 @@ export function KinshipTextNode(props: NodeProps<KinshipTextNodeType>) {
           aria-valuenow={Math.round(rotation)}
           title="Drag to rotate (hold Shift to snap to 15°)"
         >
-          <span aria-hidden className="kinship-text-card__rotation-handle-stem" />
+          <span
+            aria-hidden
+            className="kinship-text-card__rotation-handle-stem"
+          />
         </div>
       ) : null}
     </div>

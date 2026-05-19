@@ -440,7 +440,8 @@ returns table (
   user_id uuid,
   label text,
   full_name text,
-  age integer
+  age integer,
+  status text
 )
 language plpgsql
 security definer
@@ -457,10 +458,24 @@ begin
       links.user_id,
       coalesce(users.nickname, users.name, users.email, 'Linked user') as label,
       ltrim(rtrim(concat_ws(' ', users.first_name, users.middle_name, users.last_name))) as full_name,
-      users.age
+      users.age,
+      'linked'::text as status
     from public.kinship_node_user_links links
     left join public.users users on users.id = links.user_id
     where links.chart_id = target_chart_id;
+
+  return query
+    select
+      invitations.node_id,
+      invitations.invitee_id as user_id,
+      coalesce(users.nickname, users.name, users.email, 'Pending invitation') as label,
+      ltrim(rtrim(concat_ws(' ', users.first_name, users.middle_name, users.last_name))) as full_name,
+      users.age,
+      'pending'::text as status
+    from public.kinship_node_invitations invitations
+    left join public.users users on users.id = invitations.invitee_id
+    where invitations.chart_id = target_chart_id
+      and invitations.status = 'pending';
 end;
 $$;
 

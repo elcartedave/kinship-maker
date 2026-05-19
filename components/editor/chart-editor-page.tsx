@@ -11,6 +11,7 @@ import {
   ReactFlow,
   type Connection,
   type ConnectionLineComponentProps,
+  type NodeChange,
   type ReactFlowInstance,
 } from "@xyflow/react";
 import { useRouter } from "next/navigation";
@@ -88,7 +89,9 @@ import {
   isEgoSymbolType,
   isMaleSymbolType,
   isSymbolNode,
+  isSymbolTypeAllowedForSexAssignedAtBirth,
   isTextNode,
+  normalizeSexAssignedAtBirth,
 } from "@/lib/kinship/symbols";
 import type {
   ChartDocument,
@@ -123,12 +126,48 @@ type CanvasTool = "hand" | "pointer";
 
 const CHART_HISTORY_LIMIT = 64;
 
+function isRemoteChartStale(
+  remoteUpdatedAt: string,
+  appliedUpdatedAt: string | null,
+): boolean {
+  const remoteTime = new Date(remoteUpdatedAt).getTime();
+  if (Number.isNaN(remoteTime)) {
+    return false;
+  }
+  if (!appliedUpdatedAt) {
+    return false;
+  }
+  const appliedTime = new Date(appliedUpdatedAt).getTime();
+  if (Number.isNaN(appliedTime)) {
+    return false;
+  }
+  return remoteTime <= appliedTime;
+}
+
+function isNodeGestureEndChange(change: NodeChange<KinshipNode>): boolean {
+  return (
+    (change.type === "position" && change.dragging === false) ||
+    (change.type === "dimensions" && change.resizing === false)
+  );
+}
+
+function isNodeGestureInProgressChange(
+  change: NodeChange<KinshipNode>,
+): boolean {
+  return (
+    (change.type === "position" && change.dragging === true) ||
+    (change.type === "dimensions" && change.resizing === true)
+  );
+}
+
 type NodeUserLink = {
   node_id: string;
   user_id: string;
   label: string;
   full_name?: string | null;
   age?: number | null;
+  sex_assigned_at_birth?: "female" | "male" | null;
+  status?: "linked" | "pending";
 };
 
 function getCurrentUserLinkedLabel(
@@ -194,11 +233,14 @@ const edgeTypes = {
 };
 
 function stripNodeEditorState(node: KinshipNode): KinshipNode {
-  const { dragging: _dragging, selected: _selected, ...cleanNode } = node as
-    KinshipNode & {
-      dragging?: boolean;
-      selected?: boolean;
-    };
+  const {
+    dragging: _dragging,
+    selected: _selected,
+    ...cleanNode
+  } = node as KinshipNode & {
+    dragging?: boolean;
+    selected?: boolean;
+  };
   return cleanNode as KinshipNode;
 }
 
@@ -511,27 +553,21 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
     chartStateRef.current = { nodes, edges, viewport };
   }, [nodes, edges, viewport]);
 
-  const setNodesState = useCallback(
-    (nextNodes: KinshipNode[]) => {
-      chartStateRef.current = {
-        ...chartStateRef.current,
-        nodes: nextNodes,
-      };
-      setNodes(nextNodes);
-    },
-    [],
-  );
+  const setNodesState = useCallback((nextNodes: KinshipNode[]) => {
+    chartStateRef.current = {
+      ...chartStateRef.current,
+      nodes: nextNodes,
+    };
+    setNodes(nextNodes);
+  }, []);
 
-  const setEdgesState = useCallback(
-    (nextEdges: KinshipEdge[]) => {
-      chartStateRef.current = {
-        ...chartStateRef.current,
-        edges: nextEdges,
-      };
-      setEdges(nextEdges);
-    },
-    [],
-  );
+  const setEdgesState = useCallback((nextEdges: KinshipEdge[]) => {
+    chartStateRef.current = {
+      ...chartStateRef.current,
+      edges: nextEdges,
+    };
+    setEdges(nextEdges);
+  }, []);
 
   function syncHistoryUi() {
     setUndoAvailable(historyPastRef.current.length > 0);
@@ -620,7 +656,10 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
   }, [chartOwnerId, egoNodeId, nodeUserLinks, nodes, user]);
 
   const collapseState = useMemo(() => {
-    const { parentsByChild, childrenByParent } = buildLineageIndex(nodes, edges);
+    const { parentsByChild, childrenByParent } = buildLineageIndex(
+      nodes,
+      edges,
+    );
     const { partnersByNode } = buildPartnerIndex(nodes, edges);
 
     if (collapsedRoots.size === 0) {
@@ -731,11 +770,19 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
         node_id: selectedNodeId,
         user_id: user.id,
         label: getCurrentUserLinkedLabel(user),
+        sex_assigned_at_birth: egoSexAssignedAtBirth,
+        status: "linked",
       };
     }
 
     return null;
-  }, [currentUserLinkedNodeId, nodeUserLinks, selectedNodeId, user]);
+  }, [
+    currentUserLinkedNodeId,
+    egoSexAssignedAtBirth,
+    nodeUserLinks,
+    selectedNodeId,
+    user,
+  ]);
   const canManageNodeLinks = Boolean(
     authEnabled && user && chartOwnerId === user.id,
   );
@@ -825,7 +872,9 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
         setSavingLocal(false);
         startTransition(() => {
           setSavedAt(saved.updatedAt);
-          setLocalStatus(`Saved offline at ${formatSaveStamp(saved.updatedAt)}`);
+          setLocalStatus(
+            `Saved offline at ${formatSaveStamp(saved.updatedAt)}`,
+          );
           if (dirty && authEnabled && user) {
             setCloudPending(true);
           }
@@ -856,7 +905,14 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
         setSavingLocal(false);
       }
     },
-    [authEnabled, broadcastLocalChartRecord, chartId, isOnline, syncChart, user],
+    [
+      authEnabled,
+      broadcastLocalChartRecord,
+      chartId,
+      isOnline,
+      syncChart,
+      user,
+    ],
   );
 
   const persistImmediateSnapshot = useCallback(
@@ -896,7 +952,14 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
       setSelectedEdgeIds([]);
       persistImmediateSnapshot({ nextNodes, nextEdges });
     },
-    [commitBeforeChange, edges, nodes, persistImmediateSnapshot, setEdgesState, setNodesState],
+    [
+      commitBeforeChange,
+      edges,
+      nodes,
+      persistImmediateSnapshot,
+      setEdgesState,
+      setNodesState,
+    ],
   );
 
   const refreshNodeUserLinks = useCallback(async () => {
@@ -915,6 +978,25 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
       return;
     }
 
+    const userIds = [
+      ...new Set(data.map((link: { user_id: string }) => link.user_id)),
+    ];
+    const sexByUserId = new Map<string, "female" | "male">();
+
+    if (userIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from("users")
+        .select("id, sex_assigned_at_birth")
+        .in("id", userIds);
+
+      for (const profile of profiles ?? []) {
+        const sex = normalizeSexAssignedAtBirth(profile.sex_assigned_at_birth);
+        if (sex) {
+          sexByUserId.set(profile.id, sex);
+        }
+      }
+    }
+
     startTransition(() =>
       setNodeUserLinks(
         data.map((link: any) => ({
@@ -923,6 +1005,8 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
           label: link.label ?? "Linked user",
           full_name: link.full_name ?? null,
           age: link.age ?? null,
+          sex_assigned_at_birth: sexByUserId.get(link.user_id) ?? null,
+          status: link.status === "pending" ? "pending" : "linked",
         })),
       ),
     );
@@ -1027,6 +1111,12 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
         return;
       }
 
+      if (
+        isRemoteChartStale(remote.updated_at, appliedRecordUpdatedAtRef.current)
+      ) {
+        return;
+      }
+
       const local = await getChartRecord(chartId);
       if (local?.dirty && localCloudPushPendingRef.current) {
         const localUpdatedAt = new Date(local.updatedAt).getTime();
@@ -1044,13 +1134,7 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
       await refreshNodeUserLinks();
       applyChartRecord(saved);
     },
-    [
-      applyChartRecord,
-      authEnabled,
-      chartId,
-      refreshNodeUserLinks,
-      user,
-    ],
+    [applyChartRecord, authEnabled, chartId, refreshNodeUserLinks, user],
   );
 
   useEffect(() => {
@@ -1119,7 +1203,9 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
           : 0;
         const remoteUpdatedAt = new Date(data.updated_at).getTime();
         const hasUnsyncedLocalEdit = Boolean(
-          local?.dirty && local.lastSyncedAt && localUpdatedAt > remoteUpdatedAt,
+          local?.dirty &&
+          local.lastSyncedAt &&
+          localUpdatedAt > remoteUpdatedAt,
         );
 
         if (!hasUnsyncedLocalEdit) {
@@ -1305,7 +1391,15 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
         }
       });
     });
-  }, [authEnabled, chartId, lastSync, router, setEdgesState, setNodesState, user]);
+  }, [
+    authEnabled,
+    chartId,
+    lastSync,
+    router,
+    setEdgesState,
+    setNodesState,
+    user,
+  ]);
 
   useEffect(() => {
     if (!authEnabled || !supabase || !user) {
@@ -1327,10 +1421,16 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
           dirty: false,
           deleted: false,
           memberIds: Array.from(
-            new Set([...(record.memberIds ?? []), record.ownerId, user.id].filter(Boolean) as string[]),
+            new Set(
+              [...(record.memberIds ?? []), record.ownerId, user.id].filter(
+                Boolean,
+              ) as string[],
+            ),
           ),
         };
-        void saveChartRecord(nextRecord).then(() => applyChartRecord(nextRecord));
+        void saveChartRecord(nextRecord).then(() =>
+          applyChartRecord(nextRecord),
+        );
       })
       .on(
         "postgres_changes",
@@ -1355,11 +1455,17 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
               : null;
           if (
             remoteUpdatedAt &&
-            remoteUpdatedAt === appliedRecordUpdatedAtRef.current
+            isRemoteChartStale(
+              remoteUpdatedAt,
+              appliedRecordUpdatedAtRef.current,
+            )
           ) {
             return;
           }
-          if (payload.eventType === "UPDATE" || payload.eventType === "INSERT") {
+          if (
+            payload.eventType === "UPDATE" ||
+            payload.eventType === "INSERT"
+          ) {
             const remote = payload.new as RemoteChartRecord;
             if (remote?.document && remote.updated_at) {
               void applyRemoteChart(remote);
@@ -1562,16 +1668,16 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
       (node) => !nodeIdSet.has(node.id),
     );
     const nextEdges = chartStateRef.current.edges.filter((edge) => {
-        if (edgeIdSet.has(edge.id)) {
-          return false;
-        }
+      if (edgeIdSet.has(edge.id)) {
+        return false;
+      }
 
-        if (nodeIdSet.has(edge.source) || nodeIdSet.has(edge.target)) {
-          return false;
-        }
+      if (nodeIdSet.has(edge.source) || nodeIdSet.has(edge.target)) {
+        return false;
+      }
 
-        return true;
-      });
+      return true;
+    });
 
     setNodesState(nextNodes);
     setEdgesState(nextEdges);
@@ -1751,11 +1857,7 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
     startTransition(() => {
       setViewport(safeViewport);
     });
-  }, [
-    displayNodes,
-    flowInstance,
-    nodes.length,
-  ]);
+  }, [displayNodes, flowInstance, nodes.length]);
 
   const fitViewToContent = useCallback(() => {
     const pane = flowWrapperRef.current;
@@ -1787,11 +1889,7 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
     startTransition(() => {
       setViewport(safeViewport);
     });
-  }, [
-    displayNodes,
-    flowInstance,
-    nodes.length,
-  ]);
+  }, [displayNodes, flowInstance, nodes.length]);
 
   const cloudStatus = authEnabled
     ? user
@@ -1878,7 +1976,39 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
       setNodesState(nextNodes);
       persistImmediateSnapshot({ nextNodes });
     },
-    [commitBeforeChange, nodes, persistImmediateSnapshot, selectedNodeId, setNodesState],
+    [
+      commitBeforeChange,
+      nodes,
+      persistImmediateSnapshot,
+      selectedNodeId,
+      setNodesState,
+    ],
+  );
+
+  const handleNodeSymbolTypeChange = useCallback(
+    (value: KinshipSymbolType) => {
+      if (!selectedNodeId) {
+        return;
+      }
+      const linkSex = selectedNodeUserLink?.sex_assigned_at_birth;
+      if (!isSymbolTypeAllowedForSexAssignedAtBirth(value, linkSex)) {
+        return;
+      }
+      commitBeforeChange();
+      const nextNodes = updateNodeData(nodes, selectedNodeId, {
+        symbolType: value,
+      });
+      setNodesState(nextNodes);
+      persistImmediateSnapshot({ nextNodes });
+    },
+    [
+      commitBeforeChange,
+      nodes,
+      persistImmediateSnapshot,
+      selectedNodeId,
+      selectedNodeUserLink?.sex_assigned_at_birth,
+      setNodesState,
+    ],
   );
 
   const handleNodeUserInvite = useCallback(
@@ -1895,7 +2025,11 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
       }
 
       if (selectedNodeUserLink) {
-        setInviteFeedback("This node is already linked to an account.");
+        setInviteFeedback(
+          selectedNodeUserLink.status === "pending"
+            ? "This node already has a pending invitation."
+            : "This node is already linked to an account.",
+        );
         return;
       }
 
@@ -1916,20 +2050,24 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
       }
 
       if (!invitee.sex_assigned_at_birth) {
-        setInviteFeedback("The invited user must complete their profile (including sex assigned at birth) before they can be linked.");
+        setInviteFeedback(
+          "The invited user must complete their profile (including sex assigned at birth) before they can be linked.",
+        );
         setInvitePending(false);
         return;
       }
 
-      const inviteeSex = String(invitee.sex_assigned_at_birth).toLowerCase().trim();
+      const inviteeSex = String(invitee.sex_assigned_at_birth)
+        .toLowerCase()
+        .trim();
       const isMaleNode = isMaleSymbolType(target.data.symbolType);
-      
+
       if (isMaleNode && inviteeSex === "female") {
         setInviteFeedback("Cannot link a female user to a male node.");
         setInvitePending(false);
         return;
       }
-      
+
       if (!isMaleNode && inviteeSex === "male") {
         setInviteFeedback("Cannot link a male user to a female node.");
         setInvitePending(false);
@@ -2239,7 +2377,10 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
                     },
                   };
 
-                  const nextEdges = addEdge(newEdge, chartStateRef.current.edges);
+                  const nextEdges = addEdge(
+                    newEdge,
+                    chartStateRef.current.edges,
+                  );
                   setEdgesState(nextEdges);
                   setSelectedEdgeIds([newEdge.id]);
                   setSelectedNodeIds([]);
@@ -2251,9 +2392,6 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
                     currentNodes.map((node) => node.id),
                   );
                   const safeChanges = changes.filter((change) => {
-                    if (change.type === "dimensions") {
-                      return false;
-                    }
                     const changeId =
                       "id" in change
                         ? change.id
@@ -2265,9 +2403,13 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
                   const shouldCommit = safeChanges.some(
                     (change) =>
                       change.type === "remove" ||
-                      (change.type === "position" && change.dragging === false),
+                      isNodeGestureEndChange(change),
                   );
-                  if (shouldCommit) {
+                  const skipGestureEndCommit =
+                    shouldCommit &&
+                    nodeDragCommitPendingRef.current &&
+                    safeChanges.some(isNodeGestureEndChange);
+                  if (shouldCommit && !skipGestureEndCommit) {
                     commitBeforeChange();
                   }
                   if (safeChanges.length === 0) {
@@ -2276,7 +2418,7 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
                   const viewOnlyChange = safeChanges.every(
                     (change) =>
                       change.type === "select" ||
-                      (change.type === "position" && change.dragging === true),
+                      isNodeGestureInProgressChange(change),
                   );
                   if (!shouldCommit && viewOnlyChange) {
                     skipNextAutosaveRef.current = true;
@@ -2337,6 +2479,15 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
                   }
                 }}
                 onNodeDragStop={() => {
+                  nodeDragCommitPendingRef.current = false;
+                }}
+                onSelectionDragStart={() => {
+                  if (!nodeDragCommitPendingRef.current) {
+                    commitBeforeChange();
+                    nodeDragCommitPendingRef.current = true;
+                  }
+                }}
+                onSelectionDragStop={() => {
                   nodeDragCommitPendingRef.current = false;
                 }}
                 onSelectionChange={({
@@ -2463,6 +2614,10 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
             linkedUserLabel={selectedNodeUserLink?.label ?? null}
             linkedUserFullName={selectedNodeUserLink?.full_name ?? null}
             linkedUserAge={selectedNodeUserLink?.age ?? null}
+            linkedUserSexAssignedAtBirth={
+              selectedNodeUserLink?.sex_assigned_at_birth ?? null
+            }
+            linkedUserStatus={selectedNodeUserLink?.status ?? null}
             localStatus={localStatus}
             onDeleteSelection={
               selectedNode || selectedEdge ? deleteCurrentSelection : undefined
@@ -2519,19 +2674,7 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
               setNodesState(nextNodes);
               persistImmediateSnapshot({ nextNodes });
             }}
-            onNodeSymbolTypeChange={(value) => {
-              if (!selectedNodeId) {
-                return;
-              }
-
-              commitBeforeChange();
-
-              const nextNodes = updateNodeData(nodes, selectedNodeId, {
-                symbolType: value,
-              });
-              setNodesState(nextNodes);
-              persistImmediateSnapshot({ nextNodes });
-            }}
+            onNodeSymbolTypeChange={handleNodeSymbolTypeChange}
             onNodeUserInvite={
               canInviteNodeLinks && !nodeLinksLoading
                 ? handleNodeUserInvite
@@ -2820,6 +2963,10 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
                 linkedUserLabel={selectedNodeUserLink?.label ?? null}
                 linkedUserFullName={selectedNodeUserLink?.full_name ?? null}
                 linkedUserAge={selectedNodeUserLink?.age ?? null}
+                linkedUserSexAssignedAtBirth={
+                  selectedNodeUserLink?.sex_assigned_at_birth ?? null
+                }
+                linkedUserStatus={selectedNodeUserLink?.status ?? null}
                 localStatus={localStatus}
                 onDeleteSelection={
                   selectedNode || selectedEdge
@@ -2879,19 +3026,7 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
                   setNodesState(nextNodes);
                   persistImmediateSnapshot({ nextNodes });
                 }}
-                onNodeSymbolTypeChange={(value) => {
-                  if (!selectedNodeId) {
-                    return;
-                  }
-
-                  commitBeforeChange();
-
-                  const nextNodes = updateNodeData(nodes, selectedNodeId, {
-                    symbolType: value,
-                  });
-                  setNodesState(nextNodes);
-                  persistImmediateSnapshot({ nextNodes });
-                }}
+                onNodeSymbolTypeChange={handleNodeSymbolTypeChange}
                 onNodeUserInvite={
                   canInviteNodeLinks && !nodeLinksLoading
                     ? handleNodeUserInvite

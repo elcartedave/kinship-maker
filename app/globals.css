@@ -1,7 +1,7 @@
 @import "tailwindcss";
 @import "@xyflow/react/dist/style.css";
 
-@theme inline{
+@theme inline {
   --color-ink: #0f0e0d;
   --color-cream: #f7f4ef;
   --color-warm: #e8e0d4;
@@ -19,8 +19,13 @@
   --animate-float: float 6s ease-in-out infinite;
 
   @keyframes float {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-12px); }
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-12px);
+    }
   }
 }
 
@@ -49,7 +54,7 @@ body {
 
 body {
   margin: 0;
-  font-family: 'DM Sans', sans-serif;
+  font-family: "DM Sans", sans-serif;
 }
 
 a {
@@ -95,8 +100,8 @@ textarea {
   flex: 1;
   width: 100%;
   background-color: #fffdfa;
-    min-height: 100%;
-    display: flex;
+  min-height: 100%;
+  display: flex;
   background-image:
     linear-gradient(rgba(139, 129, 114, 0.18) 1px, transparent 1px),
     linear-gradient(90deg, rgba(139, 129, 114, 0.18) 1px, transparent 1px);
@@ -136,7 +141,7 @@ textarea {
 }
 
 .tool-chip[data-active="true"] {
-  border-color: rgba(127, 59, 12, 0.34);
+  border-color: hsla(25, 83%, 27%, 0.34);
   background: rgba(255, 237, 212, 0.98);
   color: var(--accent-strong);
   box-shadow: inset 0 0 0 1px rgba(127, 59, 12, 0.08);
@@ -356,6 +361,8 @@ textarea {
    stays axis-aligned. width:100% means rotated text wraps within the
    user-resized box, so widening the box prevents auto-wrap. */
 .kinship-text-card__rotor {
+  position: relative;
+  z-index: 1;
   width: 100%;
   display: flex;
   align-items: center;
@@ -388,8 +395,22 @@ textarea {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
   cursor: grab;
   transform: translateX(-50%);
-  z-index: 5;
+  z-index: 30;
   touch-action: none;
+}
+
+.kinship-text-resizer-handle,
+.kinship-text-resizer-line {
+  z-index: 20;
+  pointer-events: auto;
+}
+
+.kinship-text-resizer-handle {
+  cursor: nwse-resize;
+}
+
+.kinship-text-resizer-line {
+  cursor: move;
 }
 
 .kinship-text-card__rotation-handle:active {

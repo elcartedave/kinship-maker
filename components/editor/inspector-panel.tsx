@@ -14,7 +14,11 @@ import {
   TEXT_FONT_SIZE_MIN,
   TEXT_FONT_SIZE_STEP,
 } from "@/lib/kinship/constants";
-import { isSymbolNode, isTextNode } from "@/lib/kinship/symbols";
+import {
+  isSymbolNode,
+  isSymbolTypeAllowedForSexAssignedAtBirth,
+  isTextNode,
+} from "@/lib/kinship/symbols";
 import type {
   KinshipEdge,
   KinshipRelationshipType,
@@ -34,6 +38,8 @@ type InspectorPanelProps = {
   linkedUserLabel?: string | null;
   linkedUserFullName?: string | null;
   linkedUserAge?: number | null;
+  linkedUserSexAssignedAtBirth?: "female" | "male" | null;
+  linkedUserStatus?: "linked" | "pending" | null;
   localStatus: string;
   onDeleteSelection?: () => void;
   onClose?: () => void;
@@ -107,8 +113,6 @@ export function InspectorPanel(props: InspectorPanelProps) {
               </div>
             </div>
 
-
-
             {props.onToggleCollapse && (
               <div className="rounded-[1.25rem] border border-line bg-white/75 px-3 py-3">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-accent-strong">
@@ -147,12 +151,34 @@ export function InspectorPanel(props: InspectorPanelProps) {
                 }
                 className="mt-2 w-full rounded-2xl border border-line bg-white px-4 py-3 text-sm text-ink outline-none transition focus:border-accent"
               >
-                {SYMBOL_LIBRARY.map((symbol) => (
-                  <option key={symbol.type} value={symbol.type}>
-                    {symbol.name}
-                  </option>
-                ))}
+                {SYMBOL_LIBRARY.map((symbol) => {
+                  const allowed =
+                    !props.linkedUserSexAssignedAtBirth ||
+                    isSymbolTypeAllowedForSexAssignedAtBirth(
+                      symbol.type,
+                      props.linkedUserSexAssignedAtBirth,
+                    );
+                  return (
+                    <option
+                      key={symbol.type}
+                      value={symbol.type}
+                      disabled={!allowed}
+                    >
+                      {symbol.name}
+                    </option>
+                  );
+                })}
               </select>
+              {props.linkedUserSexAssignedAtBirth ? (
+                <p className="mt-2 text-xs leading-5 text-ink-soft">
+                  This node is linked to an account. Only{" "}
+                  {props.linkedUserSexAssignedAtBirth === "male"
+                    ? "male"
+                    : "female"}{" "}
+                  symbol variants (including adopted, deceased, and ego) can be
+                  selected.
+                </p>
+              ) : null}
             </label>
 
             <label className="block">
@@ -295,6 +321,7 @@ function NodeUserInvite({
   linkedUserLabel,
   linkedUserFullName,
   linkedUserAge,
+  linkedUserStatus,
   loading,
   onUnlink,
   pending,
@@ -305,6 +332,7 @@ function NodeUserInvite({
   linkedUserLabel?: string | null;
   linkedUserFullName?: string | null;
   linkedUserAge?: number | null;
+  linkedUserStatus?: "linked" | "pending" | null;
   loading?: boolean;
   onUnlink?: () => void;
   pending?: boolean;
@@ -335,21 +363,46 @@ function NodeUserInvite({
       ) : linkedUserLabel ? (
         <div className="mt-2 space-y-3">
           <div>
-            <p className="text-sm leading-6 text-ink-soft">
-              This node is linked to <strong>{linkedUserLabel}</strong>.
-            </p>
-            {linkedUserFullName ? (
-              <span className="block text-xs font-medium text-ink-soft/80 mt-1">
-                {linkedUserFullName}
-                {linkedUserAge != null ? ` • ${linkedUserAge} y/o` : ""}
-              </span>
-            ) : linkedUserAge != null ? (
-              <span className="block text-xs font-medium text-ink-soft/80 mt-1">
-                {linkedUserAge} y/o
-              </span>
-            ) : null}
+            {linkedUserStatus === "pending" ? (
+              <>
+                <p className="text-sm leading-6 text-ink-soft">
+                  Pending invitation sent to <strong>{linkedUserLabel}</strong>.
+                </p>
+                {linkedUserFullName ? (
+                  <span className="block text-xs font-medium text-ink-soft/80 mt-1">
+                    {linkedUserFullName}
+                    {linkedUserAge != null ? ` • ${linkedUserAge} y/o` : ""}
+                  </span>
+                ) : linkedUserAge != null ? (
+                  <span className="block text-xs font-medium text-ink-soft/80 mt-1">
+                    {linkedUserAge} y/o
+                  </span>
+                ) : null}
+              </>
+            ) : (
+              <>
+                <p className="text-sm leading-6 text-ink-soft">
+                  This node is linked to <strong>{linkedUserLabel}</strong>.
+                </p>
+                {linkedUserFullName ? (
+                  <span className="block text-xs font-medium text-ink-soft/80 mt-1">
+                    {linkedUserFullName}
+                    {linkedUserAge != null ? ` • ${linkedUserAge} y/o` : ""}
+                  </span>
+                ) : linkedUserAge != null ? (
+                  <span className="block text-xs font-medium text-ink-soft/80 mt-1">
+                    {linkedUserAge} y/o
+                  </span>
+                ) : null}
+              </>
+            )}
           </div>
-          {canManage && onUnlink ? (
+          {linkedUserStatus === "pending" ? (
+            <p className="rounded-[1rem] border border-dashed border-line bg-white/70 px-3 py-2 text-xs leading-5 text-ink-soft">
+              You can’t send another invite until this one is approved,
+              rejected, or cancelled.
+            </p>
+          ) : canManage && onUnlink ? (
             <button
               type="button"
               onClick={onUnlink}
@@ -360,7 +413,7 @@ function NodeUserInvite({
             </button>
           ) : null}
         </div>
-      ) : onInvite ? (
+      ) : onInvite && linkedUserStatus !== "pending" ? (
         <>
           <p className="mt-2 text-xs leading-5 text-ink-soft">
             Search by email to invite a real app user to approve this node as
@@ -377,12 +430,16 @@ function NodeUserInvite({
             <button
               type="submit"
               disabled={pending}
-              className="rounded-full bg-accent px-3 py-2 text-xs font-semibold text-white transition hover:bg-accent-strong disabled:cursor-wait disabled:opacity-70"
+              className="rounded-full border border-ink bg-ink px-3 py-2 text-xs font-semibold text-white transition hover:bg-white hover:text-ink disabled:cursor-wait disabled:opacity-70"
             >
               Invite
             </button>
           </div>
         </>
+      ) : linkedUserStatus === "pending" ? (
+        <p className="mt-2 text-xs leading-5 text-ink-soft">
+          This invitation is already pending.
+        </p>
       ) : (
         <p className="mt-2 text-xs leading-5 text-ink-soft">
           No account is linked to this node.

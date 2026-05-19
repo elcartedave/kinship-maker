@@ -8,8 +8,12 @@ import { KinshipSymbolPreview } from "@/components/editor/kinship-symbol-preview
 import type { KinshipSymbolNode } from "@/lib/kinship/types";
 
 export function KinshipNode(props: NodeProps<KinshipSymbolNode>) {
-  const { getNodeLabelState, getNodeSymbolType, showConnectionHandles, updateNodeLabel } =
-    useKinshipEditorContext();
+  const {
+    getNodeLabelState,
+    getNodeSymbolType,
+    showConnectionHandles,
+    updateNodeLabel,
+  } = useKinshipEditorContext();
   const labelState = getNodeLabelState(props.id, props.data.label);
   const symbolType = getNodeSymbolType(props.id, props.data.symbolType);
   const handleClassName = showConnectionHandles
@@ -22,17 +26,22 @@ export function KinshipNode(props: NodeProps<KinshipSymbolNode>) {
         className="flex h-full w-full flex-col items-center justify-center gap-px rounded-[1.4rem] px-2 relative"
         style={{ minHeight: NODE_SHAPE_SIZE }}
       >
-        <div className="relative flex items-center justify-center" style={{ width: NODE_SHAPE_SIZE, height: NODE_SHAPE_SIZE }}>
+        <div
+          className="relative flex items-center justify-center"
+          style={{ width: NODE_SHAPE_SIZE, height: NODE_SHAPE_SIZE }}
+        >
           <KinshipSymbolPreview
             symbolType={symbolType}
             className="block shrink-0 -mb-1.5"
           />
           {props.data.isCollapsedBranchRoot && (
             <div
-              className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-accent text-white shadow-sm ring-2 ring-white"
+              className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full border border-white bg-ink text-white shadow-md ring-2 ring-ink/30"
               title="This branch has hidden descendants"
             >
-              <span className="mb-0.5 text-xs font-bold tracking-tight">...</span>
+              <span className="mb-0.5 text-xs font-bold tracking-tight">
+                ...
+              </span>
             </div>
           )}
 
@@ -40,25 +49,25 @@ export function KinshipNode(props: NodeProps<KinshipSymbolNode>) {
             id="top"
             type="target"
             position={Position.Top}
-            className={`!z-50 kinship-handle kinship-handle-lineage ${handleClassName ?? ""}`}
+            className={`z-50! kinship-handle kinship-handle-lineage ${handleClassName ?? ""}`}
           />
           <Handle
             id="left"
             type="target"
             position={Position.Left}
-            className={`!z-50 kinship-handle kinship-handle-side ${handleClassName ?? ""}`}
+            className={`z-50! kinship-handle kinship-handle-side ${handleClassName ?? ""}`}
           />
           <Handle
             id="right"
             type="source"
             position={Position.Right}
-            className={`!z-50 kinship-handle kinship-handle-side ${handleClassName ?? ""}`}
+            className={`z-50! kinship-handle kinship-handle-side ${handleClassName ?? ""}`}
           />
           <Handle
             id="bottom"
             type="source"
             position={Position.Bottom}
-            className={`!z-50 kinship-handle kinship-handle-lineage ${handleClassName ?? ""}`}
+            className={`z-50! kinship-handle kinship-handle-lineage ${handleClassName ?? ""}`}
           />
         </div>
 

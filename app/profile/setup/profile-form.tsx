@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect, useRef } from "react";
+import { toast } from "sonner";
 
 import {
   saveProfile,
@@ -23,6 +24,28 @@ function FieldError({ messages }: { messages?: string[] }) {
   return <p className="mt-2 text-sm text-[rgb(153,53,36)]">{messages[0]}</p>;
 }
 
+function getToastMessage(state: ProfileFormState) {
+  const formMessage = state.errors?.form?.[0];
+  if (formMessage) {
+    return formMessage;
+  }
+
+  const fieldMessages = [
+    state.errors?.firstName?.[0],
+    state.errors?.middleName?.[0],
+    state.errors?.lastName?.[0],
+    state.errors?.nickname?.[0],
+    state.errors?.age?.[0],
+    state.errors?.sexAssignedAtBirth?.[0],
+  ].filter(Boolean);
+
+  if (fieldMessages.length > 0) {
+    return fieldMessages[0] as string;
+  }
+
+  return null;
+}
+
 export function ProfileForm({
   initialValues,
   nextPath,
@@ -34,16 +57,26 @@ export function ProfileForm({
   };
   const [state, action, pending] = useActionState(saveProfile, initialState);
   const values = state.values ?? initialValues;
+  const toastMessage = getToastMessage(state);
+  const lastToastMessageRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (pending || !toastMessage) {
+      return;
+    }
+
+    if (lastToastMessageRef.current === toastMessage) {
+      return;
+    }
+
+    lastToastMessageRef.current = toastMessage;
+
+    toast(toastMessage);
+  }, [pending, toastMessage]);
 
   return (
     <form action={action} className="mt-8 grid gap-5">
       <input type="hidden" name="next" value={nextPath} />
-
-      {state.errors?.form?.length ? (
-        <p className="rounded-[1.25rem] border border-[rgba(153,53,36,0.22)] bg-white/75 px-4 py-3 text-sm leading-6 text-[rgb(153,53,36)]">
-          {state.errors.form[0]}
-        </p>
-      ) : null}
 
       {email ? (
         <label className="block">
@@ -157,7 +190,7 @@ export function ProfileForm({
       <button
         type="submit"
         disabled={pending}
-        className="mt-2 inline-flex w-fit rounded-full bg-accent px-5 py-3 font-semibold text-white transition hover:bg-accent-strong disabled:cursor-wait disabled:opacity-70"
+        className="mt-2 inline-flex w-fit rounded-full border border-ink bg-ink px-5 py-3 font-semibold text-cream shadow-[0_6px_18px_rgba(15,14,13,0.08)] transition hover:bg-cream hover:text-ink disabled:cursor-wait disabled:opacity-70"
       >
         {pending ? "Saving..." : submitLabel}
       </button>
