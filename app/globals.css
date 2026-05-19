@@ -1,20 +1,6 @@
 @import "tailwindcss";
 @import "@xyflow/react/dist/style.css";
 
-:root {
-  --background: #f7eed4;
-  --background-strong: #efe1b7;
-  --panel: rgba(255, 251, 239, 0.92);
-  --panel-strong: #fff8e8;
-  --ink: #2f2413;
-  --ink-soft: #62543c;
-  --line: rgba(105, 85, 47, 0.18);
-  --accent: #b76a2f;
-  --accent-strong: #7f3b0c;
-  --accent-cool: #567aa2;
-  --shadow: 0 20px 45px rgba(74, 54, 23, 0.14);
-}
-
 @theme inline{
   --color-ink: #0f0e0d;
   --color-cream: #f7f4ef;
@@ -63,11 +49,6 @@ body {
 
 body {
   margin: 0;
-  background:
-    radial-gradient(circle at top left, rgba(255, 249, 231, 0.95), transparent 35%),
-    radial-gradient(circle at top right, rgba(223, 194, 140, 0.26), transparent 30%),
-    linear-gradient(180deg, #fbf5e6 0%, var(--background) 100%);
-  color: var(--ink);
   font-family: 'DM Sans', sans-serif;
 }
 
