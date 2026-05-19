@@ -25,7 +25,29 @@ import {
   saveChartRecord,
 } from "@/lib/kinship/local-store";
 import { createSampleChartDocument } from "@/lib/kinship/sample-chart";
-import type { ChartRecord } from "@/lib/kinship/types";
+import type { ChartDocument, ChartRecord } from "@/lib/kinship/types";
+import { createBilateralChartDocument } from "@/lib/kinship/bilateral-chart";
+import { createMatrilinealChartDocument } from "@/lib/kinship/matrilineal-chart";
+import { createPatrilinealChartDocument } from "@/lib/kinship/patrilineal-chart";
+
+type TemplateType = "patrilineal" | "matrilineal" | "bilateral";
+
+const CHART_TEMPLATES: { type: TemplateType; label: string }[] = [
+  { type: "patrilineal", label: "Patrilineal chart" },
+  { type: "matrilineal", label: "Matrilineal chart" },
+  { type: "bilateral", label: "Bilateral chart" },
+];
+
+function chartDocumentForTemplate(type: TemplateType): ChartDocument {
+  switch (type) {
+    case "patrilineal":
+      return createPatrilinealChartDocument();
+    case "matrilineal":
+      return createMatrilinealChartDocument();
+    case "bilateral":
+      return createBilateralChartDocument();
+  }
+}
 
 function formatUpdatedAt(value: string) {
   return new Intl.DateTimeFormat(undefined, {
@@ -203,6 +225,53 @@ export function DashboardPage() {
     setBusyAction(null);
   }
 
+  async function handleCreateFromTemplate(type: TemplateType) {
+    setFeedback(null);
+		
+    if (!authEnabled) {
+			setBusyAction(type);
+			const document = chartDocumentForTemplate(type);
+      const record = await createChartFromDocument(
+        document.meta.title,
+        document,
+      );
+      router.push(`/charts/${record.id}`);
+      setBusyAction(null);
+      return;
+    }
+
+    if (!user || !supabase) {
+      setFeedback("Sign in with Google to create a chart from this template.");
+      return;
+    }
+
+    setBusyAction(type);
+		const document = chartDocumentForTemplate(type);
+    const id = crypto.randomUUID();
+    const { data, error } = await supabase
+      .from("charts")
+      .insert({
+        id,
+        user_id: user.id,
+        title: document.meta.title,
+        document,
+        updated_at: document.meta.updatedAt,
+      })
+      .select("id, user_id, title, document, updated_at")
+      .single();
+
+    if (error || !data) {
+      setFeedback(error?.message ?? "Could not create chart from template.");
+      setBusyAction(null);
+      return;
+    }
+
+    await saveChartRecord(remoteChartToLocal(data));
+    await loadCharts();
+    router.push(`/charts/${id}`);
+    setBusyAction(null);
+  }
+
   async function handleDelete(id: string) {
     if (authEnabled && !user) {
       return;
@@ -270,6 +339,17 @@ export function DashboardPage() {
                       ? "Loading sample..."
                       : "Load sample chart"}
                   </button>
+                  {CHART_TEMPLATES.map(({ type, label }) => (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => void handleCreateFromTemplate(type)}
+                      disabled={busyAction === type}
+                      className="rounded-full border border-line bg-white/70 px-5 py-3 font-semibold text-ink transition hover:border-accent/40 hover:bg-white disabled:cursor-wait disabled:opacity-70"
+                    >
+                      {busyAction === type ? "Creating..." : label}
+                    </button>
+                  ))}
                 </>
               ) : (
                 <p className="max-w-md rounded-2xl border border-line bg-white/70 px-4 py-3 text-sm leading-6 text-ink-soft">
