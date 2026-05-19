@@ -66,7 +66,11 @@ import {
   computeEgoBiasedViewport,
   sanitizeChartViewport,
 } from "@/lib/kinship/editor-viewport";
-import { duplicateNode, updateEdgeData, updateNodeData } from "@/lib/kinship/editor-state";
+import {
+  duplicateNode,
+  updateEdgeData,
+  updateNodeData,
+} from "@/lib/kinship/editor-state";
 import { exportChartAsPdf, exportChartAsPng } from "@/lib/kinship/export";
 import { useOnlineStatus } from "@/lib/kinship/use-online-status";
 import { deriveKinshipLabels } from "@/lib/kinship/kinship-labels";
@@ -77,7 +81,13 @@ import {
   saveChartDocument,
   saveChartRecord,
 } from "@/lib/kinship/local-store";
-import { isMaleSymbolType, isSymbolNode, isTextNode } from "@/lib/kinship/symbols";
+import {
+  getKinshipGender,
+  isEgoSymbolType,
+  isMaleSymbolType,
+  isSymbolNode,
+  isTextNode,
+} from "@/lib/kinship/symbols";
 import type {
   ChartDocument,
   ChartRecord,
@@ -108,6 +118,59 @@ import {
 type CanvasTool = "hand" | "pointer";
 
 const CHART_HISTORY_LIMIT = 64;
+
+type NodeUserLink = {
+  node_id: string;
+  user_id: string;
+  label: string;
+};
+
+function getCurrentUserLinkedLabel(
+  user: { email?: string; user_metadata?: Record<string, unknown> } | null,
+) {
+  if (!user) {
+    return "Your account";
+  }
+
+  const nickname = user.user_metadata?.nickname;
+  const name = user.user_metadata?.name ?? user.user_metadata?.full_name;
+
+  if (typeof nickname === "string" && nickname.trim()) {
+    return nickname.trim();
+  }
+
+  if (typeof name === "string" && name.trim()) {
+    return name.trim();
+  }
+
+  return user.email ?? "Your account";
+}
+
+function symbolTypeForCurrentEgo(
+  symbolType: KinshipSymbolType,
+  nodeId: string,
+  currentEgoNodeId: string | null,
+  egoSexAssignedAtBirth: "female" | "male" | null,
+): KinshipSymbolType {
+  if (currentEgoNodeId && nodeId === currentEgoNodeId) {
+    if (egoSexAssignedAtBirth === "female") {
+      return "female-ego";
+    }
+    if (egoSexAssignedAtBirth === "male") {
+      return "male-ego";
+    }
+
+    const gender = getKinshipGender(symbolType);
+    return gender === "male" ? "male-ego" : "female-ego";
+  }
+
+  if (!currentEgoNodeId || !isEgoSymbolType(symbolType)) {
+    return symbolType;
+  }
+
+  const gender = getKinshipGender(symbolType);
+  return gender === "male" ? "male" : "female";
+}
 
 const nodeTypes = {
   kinshipSymbol: KinshipNodeComponent,
@@ -140,15 +203,23 @@ function isValidConnectionForTool(
   },
   relationshipType: KinshipRelationshipType,
 ) {
-  if (!connection.source || !connection.target || connection.source === connection.target) {
+  if (
+    !connection.source ||
+    !connection.target ||
+    connection.source === connection.target
+  ) {
     return false;
   }
 
   if (relationshipType === "descended-from") {
-    return connection.sourceHandle === "bottom" && connection.targetHandle === "top";
+    return (
+      connection.sourceHandle === "bottom" && connection.targetHandle === "top"
+    );
   }
 
-  return connection.sourceHandle === "right" && connection.targetHandle === "left";
+  return (
+    connection.sourceHandle === "right" && connection.targetHandle === "left"
+  );
 }
 
 function getPointerClientPosition(
@@ -217,8 +288,10 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
   const [aiGenerateOpen, setAiGenerateOpen] = useState(false);
   const [edges, setEdges] = useState<KinshipEdge[]>([]);
   const [exporting, setExporting] = useState<"pdf" | "png" | null>(null);
-  const [flowInstance, setFlowInstance] =
-    useState<ReactFlowInstance<KinshipNode, KinshipEdge> | null>(null);
+  const [flowInstance, setFlowInstance] = useState<ReactFlowInstance<
+    KinshipNode,
+    KinshipEdge
+  > | null>(null);
   const [loading, setLoading] = useState(true);
   const [localStatus, setLocalStatus] = useState("Loading chart...");
   const [mobileInspectorOpen, setMobileInspectorOpen] = useState(false);
@@ -240,6 +313,15 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
   const [cloudSavedAt, setCloudSavedAt] = useState<string | null>(null);
   const [cloudPending, setCloudPending] = useState(false);
   const [cloudErrored, setCloudErrored] = useState(false);
+  const [egoNodeId, setEgoNodeId] = useState<string | null>(null);
+  const [chartOwnerId, setChartOwnerId] = useState<string | null>(null);
+  const [inviteFeedback, setInviteFeedback] = useState<string | null>(null);
+  const [invitePending, setInvitePending] = useState(false);
+  const [nodeLinksLoading, setNodeLinksLoading] = useState(false);
+  const [nodeUserLinks, setNodeUserLinks] = useState<NodeUserLink[]>([]);
+  const [egoSexAssignedAtBirth, setEgoSexAssignedAtBirth] = useState<
+    "female" | "male" | null
+  >(null);
 
   const chartStateRef = useRef({
     nodes: [] as KinshipNode[],
@@ -330,6 +412,82 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
     () => edges.find((edge) => edge.id === selectedEdgeId) ?? null,
     [edges, selectedEdgeId],
   );
+  const currentUserLinkedNodeId = useMemo(() => {
+    if (!user) {
+      return null;
+    }
+
+    const persistedEgoNodeId =
+      nodes.find(
+        (node) => isSymbolNode(node) && isEgoSymbolType(node.data.symbolType),
+      )?.id ?? null;
+
+    return (
+      nodeUserLinks.find((link) => link.user_id === user.id)?.node_id ??
+      egoNodeId ??
+      (chartOwnerId === user.id ? persistedEgoNodeId : null) ??
+      null
+    );
+  }, [chartOwnerId, egoNodeId, nodeUserLinks, nodes, user]);
+
+  const displayNodes = useMemo<KinshipNode[]>(
+    () =>
+      nodes.map((node) => {
+        if (!isSymbolNode(node)) {
+          return node;
+        }
+
+        const symbolType = symbolTypeForCurrentEgo(
+          node.data.symbolType,
+          node.id,
+          currentUserLinkedNodeId,
+          egoSexAssignedAtBirth,
+        );
+
+        if (symbolType === node.data.symbolType) {
+          return node;
+        }
+
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            symbolType,
+          },
+        };
+      }),
+    [currentUserLinkedNodeId, egoSexAssignedAtBirth, nodes],
+  );
+  const selectedDisplayNode = useMemo(
+    () => displayNodes.find((node) => node.id === selectedNodeId) ?? null,
+    [displayNodes, selectedNodeId],
+  );
+  const selectedNodeUserLink = useMemo(() => {
+    if (!selectedNodeId) {
+      return null;
+    }
+
+    const persistedLink =
+      nodeUserLinks.find((link) => link.node_id === selectedNodeId) ?? null;
+
+    if (persistedLink) {
+      return persistedLink;
+    }
+
+    if (selectedNodeId === currentUserLinkedNodeId && user) {
+      return {
+        node_id: selectedNodeId,
+        user_id: user.id,
+        label: getCurrentUserLinkedLabel(user),
+      };
+    }
+
+    return null;
+  }, [currentUserLinkedNodeId, nodeUserLinks, selectedNodeId, user]);
+  const canManageNodeLinks = Boolean(
+    authEnabled && user && chartOwnerId === user.id,
+  );
+  const canInviteNodeLinks = Boolean(authEnabled && user);
 
   function arraysEqual(left: string[], right: string[]) {
     if (left === right) {
@@ -346,8 +504,8 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
     return true;
   }
   const derivedKinshipLabels = useMemo(
-    () => deriveKinshipLabels(nodes, edges),
-    [edges, nodes],
+    () => deriveKinshipLabels(nodes, edges, currentUserLinkedNodeId),
+    [currentUserLinkedNodeId, edges, nodes],
   );
   const activeTool = useMemo(
     () =>
@@ -442,6 +600,53 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
     [commitBeforeChange, edges, nodes, persistImmediateSnapshot],
   );
 
+  const refreshNodeUserLinks = useCallback(async () => {
+    if (!authEnabled || !user || !supabase) {
+      setNodeUserLinks([]);
+      return;
+    }
+
+    setNodeLinksLoading(true);
+    const { data, error } = await supabase.rpc("get_kinship_node_user_links", {
+      target_chart_id: chartId,
+    });
+
+    if (error || !data) {
+      setNodeLinksLoading(false);
+      return;
+    }
+
+    startTransition(() =>
+      setNodeUserLinks(
+        data.map((link) => ({
+          node_id: link.node_id,
+          user_id: link.user_id,
+          label: link.label ?? "Linked user",
+        })),
+      ),
+    );
+    setNodeLinksLoading(false);
+  }, [authEnabled, chartId, supabase, user]);
+
+  useEffect(() => {
+    if (!authEnabled || !user || !supabase) {
+      setEgoSexAssignedAtBirth(null);
+      return;
+    }
+
+    void supabase
+      .from("users")
+      .select("sex_assigned_at_birth")
+      .eq("id", user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        const value = data?.sex_assigned_at_birth;
+        setEgoSexAssignedAtBirth(
+          value === "female" || value === "male" ? value : null,
+        );
+      });
+  }, [authEnabled, supabase, user]);
+
   useEffect(() => {
     let active = true;
 
@@ -456,18 +661,22 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
         setNodes(hydrateNodes(freshRecord.document.nodes));
         setEdges(hydrateEdges(freshRecord.document.edges));
         setViewport(
-          sanitizeChartViewport(freshRecord.document.viewport ?? DEFAULT_VIEWPORT),
+          sanitizeChartViewport(
+            freshRecord.document.viewport ?? DEFAULT_VIEWPORT,
+          ),
         );
         setLocalStatus(
           freshRecord.updatedAt
             ? `Saved offline at ${formatSaveStamp(freshRecord.updatedAt)}`
             : "Ready",
         );
+        setChartOwnerId(freshRecord.ownerId ?? null);
         // Seed the indicator from the persisted record so the title pill
         // displays "Saved" immediately on open instead of flashing through
         // a "Loading" state until the next event.
         setSavedAt(freshRecord.updatedAt ?? null);
         if (authEnabled && user) {
+          setEgoNodeId(freshRecord.egoNodeId ?? null);
           if (freshRecord.dirty) {
             setCloudPending(true);
             setCloudSavedAt(freshRecord.lastSyncedAt ?? null);
@@ -505,28 +714,53 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
       }
 
       const local = await getChartRecord(chartId);
-      if (local && local.ownerId === user.id && !local.deleted) {
-        applyRecord(local);
+      if (
+        local &&
+        !local.deleted &&
+        (local.ownerId === user.id || local.memberIds?.includes(user.id))
+      ) {
+        const { data: membership } = await supabase
+          .from("chart_members")
+          .select("ego_node_id")
+          .eq("chart_id", chartId)
+          .eq("user_id", user.id)
+          .maybeSingle();
+        const localWithMembership = {
+          ...local,
+          egoNodeId: membership?.ego_node_id ?? local.egoNodeId ?? null,
+        };
+        await saveChartRecord(localWithMembership);
+        void refreshNodeUserLinks();
+        applyRecord(localWithMembership);
         return;
       }
 
-      const { data, error } = await supabase
-        .from("charts")
-        .select("id, user_id, title, document, updated_at")
-        .eq("id", chartId)
-        .maybeSingle();
+      const [{ data, error }, { data: membership }] = await Promise.all([
+        supabase
+          .from("charts")
+          .select("id, user_id, title, document, updated_at")
+          .eq("id", chartId)
+          .maybeSingle(),
+        supabase
+          .from("chart_members")
+          .select("ego_node_id")
+          .eq("chart_id", chartId)
+          .eq("user_id", user.id)
+          .maybeSingle(),
+      ]);
 
       if (!active) {
         return;
       }
 
-      if (error || !data || data.user_id !== user.id) {
+      if (error || !data) {
         router.replace("/");
         return;
       }
 
-      const saved = remoteChartToLocal(data);
+      const saved = remoteChartToLocal(data, user.id, membership ?? undefined);
       await saveChartRecord(saved);
+      await refreshNodeUserLinks();
       applyRecord(saved);
     };
 
@@ -535,7 +769,15 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
     return () => {
       active = false;
     };
-  }, [authEnabled, chartId, loadingAuth, router, supabase, user]);
+  }, [
+    authEnabled,
+    chartId,
+    loadingAuth,
+    refreshNodeUserLinks,
+    router,
+    supabase,
+    user,
+  ]);
 
   useEffect(() => {
     if (!flowInstance || loading) {
@@ -547,7 +789,9 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
       return;
     }
 
-    void flowInstance.setViewport(sanitizeChartViewport(viewport), { duration: 0 });
+    void flowInstance.setViewport(sanitizeChartViewport(viewport), {
+      duration: 0,
+    });
   }, [flowInstance, loading, viewport]);
 
   const autosaveController = useMemo(
@@ -670,9 +914,6 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
     syncChart,
     user,
   ]);
-
-
-
 
   function addNode(symbolType: KinshipSymbolType, x: number, y: number) {
     commitBeforeChange();
@@ -961,9 +1202,9 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
     const paneRect = pane?.getBoundingClientRect();
     const nextViewport =
       paneRect && nodes.length > 0
-        ? computeEgoBiasedViewport({
+        ? (computeEgoBiasedViewport({
             mode: "defaultZoom",
-            nodes,
+            nodes: displayNodes,
             flowWidth: paneRect.width,
             flowHeight: paneRect.height,
             windowWidth:
@@ -972,7 +1213,7 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
                 : EDITOR_VIEWPORT_LG_BREAKPOINT_PX,
             minZoom: 0.2,
             maxZoom: 2.25,
-          }) ?? DEFAULT_VIEWPORT
+          }) ?? DEFAULT_VIEWPORT)
         : DEFAULT_VIEWPORT;
 
     const safeViewport = sanitizeChartViewport(nextViewport);
@@ -984,7 +1225,13 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
       setViewport(safeViewport);
     });
     persistImmediateSnapshot({ nextViewport: safeViewport });
-  }, [commitBeforeChange, flowInstance, nodes, persistImmediateSnapshot]);
+  }, [
+    commitBeforeChange,
+    displayNodes,
+    flowInstance,
+    nodes.length,
+    persistImmediateSnapshot,
+  ]);
 
   const fitViewToContent = useCallback(() => {
     const pane = flowWrapperRef.current;
@@ -995,7 +1242,7 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
     const rect = pane.getBoundingClientRect();
     const nextViewport = computeEgoBiasedViewport({
       mode: "fit",
-      nodes,
+      nodes: displayNodes,
       flowWidth: rect.width,
       flowHeight: rect.height,
       windowWidth:
@@ -1018,7 +1265,13 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
       setViewport(safeViewport);
     });
     persistImmediateSnapshot({ nextViewport: safeViewport });
-  }, [commitBeforeChange, flowInstance, nodes, persistImmediateSnapshot]);
+  }, [
+    commitBeforeChange,
+    displayNodes,
+    flowInstance,
+    nodes.length,
+    persistImmediateSnapshot,
+  ]);
 
   const cloudStatus = authEnabled
     ? user
@@ -1108,6 +1361,157 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
     [commitBeforeChange, nodes, persistImmediateSnapshot, selectedNodeId],
   );
 
+  const handleNodeUserInvite = useCallback(
+    async (email: string) => {
+      if (!authEnabled || !user || !supabase || !selectedNodeId) {
+        setInviteFeedback("Sign in and select a symbol node first.");
+        return;
+      }
+
+      const target = nodes.find((node) => node.id === selectedNodeId);
+      if (!target || !isSymbolNode(target)) {
+        setInviteFeedback("Only kinship symbol nodes can be linked to users.");
+        return;
+      }
+
+      if (selectedNodeUserLink) {
+        setInviteFeedback("This node is already linked to an account.");
+        return;
+      }
+
+      setInvitePending(true);
+      setInviteFeedback(null);
+
+      const normalizedEmail = email.trim().toLowerCase();
+      const { data: invitee, error: lookupError } = await supabase
+        .from("users")
+        .select("id, email")
+        .ilike("email", normalizedEmail)
+        .maybeSingle();
+
+      if (lookupError || !invitee) {
+        setInviteFeedback("No user profile was found for that email.");
+        setInvitePending(false);
+        return;
+      }
+
+      if (invitee.id === user.id) {
+        setInviteFeedback("You are already signed in as that user.");
+        setInvitePending(false);
+        return;
+      }
+
+      const { data: existingLink, error: existingLinkError } = await supabase
+        .from("kinship_node_user_links")
+        .select("node_id")
+        .eq("chart_id", chartId)
+        .eq("user_id", invitee.id)
+        .maybeSingle();
+
+      if (existingLinkError) {
+        setInviteFeedback(existingLinkError.message);
+        setInvitePending(false);
+        return;
+      }
+
+      if (existingLink) {
+        setInviteFeedback(
+          "That account is already linked to another node in this chart.",
+        );
+        setInvitePending(false);
+        return;
+      }
+
+      const { data: existingInvite, error: existingInviteError } =
+        await supabase
+          .from("kinship_node_invitations")
+          .select("node_id")
+          .eq("chart_id", chartId)
+          .eq("invitee_id", invitee.id)
+          .eq("status", "pending")
+          .maybeSingle();
+
+      if (existingInviteError) {
+        setInviteFeedback(existingInviteError.message);
+        setInvitePending(false);
+        return;
+      }
+
+      if (existingInvite) {
+        setInviteFeedback(
+          "That account already has a pending invitation in this chart.",
+        );
+        setInvitePending(false);
+        return;
+      }
+
+      const { error } = await supabase.from("kinship_node_invitations").insert({
+        chart_id: chartId,
+        node_id: selectedNodeId,
+        inviter_id: user.id,
+        invitee_id: invitee.id,
+      });
+
+      if (error) {
+        setInviteFeedback(error.message);
+        setInvitePending(false);
+        return;
+      }
+
+      setInviteFeedback("Invitation sent. It will appear in their dashboard.");
+      setInvitePending(false);
+    },
+    [
+      authEnabled,
+      chartId,
+      nodes,
+      selectedNodeId,
+      selectedNodeUserLink,
+      supabase,
+      user,
+    ],
+  );
+
+  const handleNodeUserUnlink = useCallback(async () => {
+    if (!authEnabled || !user || !supabase || !selectedNodeId) {
+      return;
+    }
+
+    if (chartOwnerId !== user.id) {
+      setInviteFeedback("Only the chart owner can remove linked accounts.");
+      return;
+    }
+
+    setInvitePending(true);
+    setInviteFeedback(null);
+    const { error } = await supabase.rpc("unlink_kinship_node_user", {
+      target_chart_id: chartId,
+      target_node_id: selectedNodeId,
+    });
+
+    if (error) {
+      setInviteFeedback(error.message);
+      setInvitePending(false);
+      return;
+    }
+
+    if (selectedNodeId === currentUserLinkedNodeId) {
+      setEgoNodeId(null);
+    }
+    await refreshNodeUserLinks();
+    setInviteFeedback("Linked account removed.");
+    setInvitePending(false);
+  }, [
+    authEnabled,
+    chartId,
+    chartOwnerId,
+    currentUserLinkedNodeId,
+    refreshNodeUserLinks,
+    selectedNodeId,
+    supabase,
+    user,
+  ]);
+
   return (
     <KinshipEditorProvider
       value={{
@@ -1183,16 +1587,20 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
             ) : (
               <ReactFlow
                 className={`kinship-canvas-grid ${
-                  canvasTool === "hand" ? "canvas-tool-hand" : "canvas-tool-pointer"
+                  canvasTool === "hand"
+                    ? "canvas-tool-hand"
+                    : "canvas-tool-pointer"
                 }`}
                 style={{ width: "100%", height: "100%" }}
-                nodes={nodes}
+                nodes={displayNodes}
                 edges={edges}
                 nodeTypes={nodeTypes}
                 edgeTypes={edgeTypes}
                 connectionLineComponent={connectionLineComponent}
                 isValidConnection={(connection) =>
-                  currentTool ? isValidConnectionForTool(connection, currentTool) : false
+                  currentTool
+                    ? isValidConnectionForTool(connection, currentTool)
+                    : false
                 }
                 onInit={setFlowInstance}
                 onDragOver={(event) => {
@@ -1227,13 +1635,20 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
                   }
 
                   setActiveSymbolType(null);
-                  placeSymbolAtClientPoint(symbolType, event.clientX, event.clientY);
+                  placeSymbolAtClientPoint(
+                    symbolType,
+                    event.clientX,
+                    event.clientY,
+                  );
                 }}
                 onMoveEnd={(_, nextViewport) => {
                   setViewport(sanitizeChartViewport(nextViewport));
                 }}
                 onConnect={(connection: Connection) => {
-                  if (!currentTool || !isValidConnectionForTool(connection, currentTool)) {
+                  if (
+                    !currentTool ||
+                    !isValidConnectionForTool(connection, currentTool)
+                  ) {
                     return;
                   }
 
@@ -1284,7 +1699,10 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
                 onNodeDragStop={() => {
                   nodeDragCommitPendingRef.current = false;
                 }}
-                onSelectionChange={({ edges: selectedEdges, nodes: selectedNodes }) => {
+                onSelectionChange={({
+                  edges: selectedEdges,
+                  nodes: selectedNodes,
+                }) => {
                   if (selectedNodes.length > 0 || selectedEdges.length > 0) {
                     setActiveSymbolType(null);
                   }
@@ -1300,8 +1718,12 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
                 }}
                 onPaneClick={() => {
                   setCurrentTool(null);
-                  setSelectedNodeIds((current) => (current.length === 0 ? current : []));
-                  setSelectedEdgeIds((current) => (current.length === 0 ? current : []));
+                  setSelectedNodeIds((current) =>
+                    current.length === 0 ? current : [],
+                  );
+                  setSelectedEdgeIds((current) =>
+                    current.length === 0 ? current : [],
+                  );
                 }}
                 deleteKeyCode={["Backspace", "Delete"]}
                 panOnDrag={canvasTool === "hand" ? [0, 1, 2] : [1, 2]}
@@ -1356,8 +1778,8 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
                 >
                   Inspector
                 </button>
+              </div>
             </div>
-        </div>
           </div>
         </section>
 
@@ -1376,8 +1798,15 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
           <InspectorPanel
             cloudStatus={cloudStatus}
             currentTool={currentTool}
+            canManageLinkedUser={canManageNodeLinks}
+            inviteFeedback={inviteFeedback}
+            invitePending={invitePending}
+            linkedUserLoading={nodeLinksLoading && !selectedNodeUserLink}
+            linkedUserLabel={selectedNodeUserLink?.label ?? null}
             localStatus={localStatus}
-            onDeleteSelection={selectedNode || selectedEdge ? deleteCurrentSelection : undefined}
+            onDeleteSelection={
+              selectedNode || selectedEdge ? deleteCurrentSelection : undefined
+            }
             onEdgeLabelChange={(value) => {
               if (!selectedEdgeId) {
                 return;
@@ -1443,12 +1872,24 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
               setNodes(nextNodes);
               persistImmediateSnapshot({ nextNodes });
             }}
+            onNodeUserInvite={
+              canInviteNodeLinks && !nodeLinksLoading
+                ? handleNodeUserInvite
+                : undefined
+            }
+            onNodeUserUnlink={
+              canManageNodeLinks && selectedNodeUserLink
+                ? handleNodeUserUnlink
+                : undefined
+            }
             onTextNodeChange={handleTextNodeChange}
             selectedEdge={selectedEdge}
             selectedNodeDerivedLabel={
-              selectedNodeId ? derivedKinshipLabels.labelsByNodeId[selectedNodeId] ?? null : null
+              selectedNodeId
+                ? (derivedKinshipLabels.labelsByNodeId[selectedNodeId] ?? null)
+                : null
             }
-            selectedNode={selectedNode}
+            selectedNode={selectedDisplayNode}
           />
         </aside>
 
@@ -1541,10 +1982,15 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
             >
               <Redo2 strokeWidth={2} />
             </IconToolbarButton>
-            <span className="mx-1 hidden h-5 w-px shrink-0 bg-line sm:inline" aria-hidden />
+            <span
+              className="mx-1 hidden h-5 w-px shrink-0 bg-line sm:inline"
+              aria-hidden
+            />
             <IconToolbarButton
               title="Copy selection (Ctrl+C / ⌘C)"
-              disabled={selectedNodeIds.length === 0 && selectedEdgeIds.length === 0}
+              disabled={
+                selectedNodeIds.length === 0 && selectedEdgeIds.length === 0
+              }
               onClick={copySelection}
             >
               <Copy strokeWidth={2} />
@@ -1587,12 +2033,17 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
             </IconToolbarButton>
             <IconToolbarButton
               title="Delete selection (Delete / Backspace)"
-              disabled={selectedNodeIds.length === 0 && selectedEdgeIds.length === 0}
+              disabled={
+                selectedNodeIds.length === 0 && selectedEdgeIds.length === 0
+              }
               onClick={deleteCurrentSelection}
             >
               <Trash2 strokeWidth={2} />
             </IconToolbarButton>
-            <span className="mx-1 hidden h-5 w-px shrink-0 bg-line sm:inline" aria-hidden />
+            <span
+              className="mx-1 hidden h-5 w-px shrink-0 bg-line sm:inline"
+              aria-hidden
+            />
             <IconToolbarButton
               title="Fit view to content"
               onClick={fitViewToContent}
@@ -1605,12 +2056,13 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
             >
               <Crosshair strokeWidth={2} />
             </IconToolbarButton>
-            <span className="mx-1 hidden h-5 w-px shrink-0 bg-line sm:inline" aria-hidden />
+            <span
+              className="mx-1 hidden h-5 w-px shrink-0 bg-line sm:inline"
+              aria-hidden
+            />
             <IconToolbarButton
               title={
-                exporting === "png"
-                  ? "Exporting PNG…"
-                  : "Export chart as PNG"
+                exporting === "png" ? "Exporting PNG…" : "Export chart as PNG"
               }
               disabled={exporting !== null}
               className={`${
@@ -1620,13 +2072,14 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
               }`}
               onClick={() => void handleExport("png")}
             >
-              <ImageDown strokeWidth={2} className={exporting !== null ? "opacity-60" : ""} />
+              <ImageDown
+                strokeWidth={2}
+                className={exporting !== null ? "opacity-60" : ""}
+              />
             </IconToolbarButton>
             <IconToolbarButton
               title={
-                exporting === "pdf"
-                  ? "Exporting PDF…"
-                  : "Export chart as PDF"
+                exporting === "pdf" ? "Exporting PDF…" : "Export chart as PDF"
               }
               disabled={exporting !== null}
               className={exporting === "pdf" ? "animate-pulse" : ""}
@@ -1645,9 +2098,7 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
               ) : (
                 <IconToolbarButton
                   title="Sign in with Google to save this chart to the cloud"
-                  onClick={() =>
-                    void signInWithGoogle(`/charts/${chartId}`)
-                  }
+                  onClick={() => void signInWithGoogle(`/charts/${chartId}`)}
                 >
                   <CloudUpload strokeWidth={2} />
                 </IconToolbarButton>
@@ -1683,8 +2134,17 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
               <InspectorPanel
                 cloudStatus={cloudStatus}
                 currentTool={currentTool}
+                canManageLinkedUser={canManageNodeLinks}
+                inviteFeedback={inviteFeedback}
+                invitePending={invitePending}
+                linkedUserLoading={nodeLinksLoading && !selectedNodeUserLink}
+                linkedUserLabel={selectedNodeUserLink?.label ?? null}
                 localStatus={localStatus}
-                onDeleteSelection={selectedNode || selectedEdge ? deleteCurrentSelection : undefined}
+                onDeleteSelection={
+                  selectedNode || selectedEdge
+                    ? deleteCurrentSelection
+                    : undefined
+                }
                 onClose={() => setMobileInspectorOpen(false)}
                 onEdgeLabelChange={(value) => {
                   if (!selectedEdgeId) {
@@ -1751,14 +2211,25 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
                   setNodes(nextNodes);
                   persistImmediateSnapshot({ nextNodes });
                 }}
+                onNodeUserInvite={
+                  canInviteNodeLinks && !nodeLinksLoading
+                    ? handleNodeUserInvite
+                    : undefined
+                }
+                onNodeUserUnlink={
+                  canManageNodeLinks && selectedNodeUserLink
+                    ? handleNodeUserUnlink
+                    : undefined
+                }
                 onTextNodeChange={handleTextNodeChange}
                 selectedEdge={selectedEdge}
                 selectedNodeDerivedLabel={
                   selectedNodeId
-                    ? derivedKinshipLabels.labelsByNodeId[selectedNodeId] ?? null
+                    ? (derivedKinshipLabels.labelsByNodeId[selectedNodeId] ??
+                      null)
                     : null
                 }
-                selectedNode={selectedNode}
+                selectedNode={selectedDisplayNode}
               />
             </div>
           </div>

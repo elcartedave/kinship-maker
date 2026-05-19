@@ -48,7 +48,13 @@ export async function saveChartDocument(
   options?: Partial<
     Pick<
       ChartRecord,
-      "cloudId" | "deleted" | "dirty" | "lastSyncedAt" | "ownerId"
+      | "cloudId"
+      | "deleted"
+      | "dirty"
+      | "egoNodeId"
+      | "lastSyncedAt"
+      | "memberIds"
+      | "ownerId"
     >
   >,
 ) {
@@ -59,6 +65,8 @@ export async function saveChartDocument(
     record.dirty = options?.dirty ?? true;
     record.deleted = options?.deleted ?? false;
     record.ownerId = options?.ownerId;
+    record.memberIds = options?.memberIds;
+    record.egoNodeId = options?.egoNodeId;
     record.cloudId = options?.cloudId;
     record.lastSyncedAt = options?.lastSyncedAt;
     await saveChartRecord(record);
@@ -73,6 +81,8 @@ export async function saveChartDocument(
     dirty: options?.dirty ?? true,
     deleted: options?.deleted ?? existing.deleted,
     ownerId: options?.ownerId ?? existing.ownerId,
+    memberIds: options?.memberIds ?? existing.memberIds,
+    egoNodeId: options?.egoNodeId ?? existing.egoNodeId,
     cloudId: options?.cloudId ?? existing.cloudId,
     lastSyncedAt: options?.lastSyncedAt ?? existing.lastSyncedAt,
   };
@@ -124,18 +134,31 @@ export async function purgeChartsNotOwnedBy(userId: string) {
   const rows = await db.charts.toArray();
   await Promise.all(
     rows
-      .filter((chart) => chart.ownerId !== userId)
+      .filter(
+        (chart) =>
+          chart.ownerId !== userId && !chart.memberIds?.includes(userId),
+      )
       .map((chart) => db.charts.delete(chart.id)),
   );
 }
 
-export function remoteChartToLocal(remote: RemoteChartRecord): ChartRecord {
+export function remoteChartToLocal(
+  remote: RemoteChartRecord,
+  accessUserId?: string,
+  membership?: { ego_node_id?: string | null },
+): ChartRecord {
+  const memberIds = Array.from(
+    new Set([remote.user_id, accessUserId].filter(Boolean) as string[]),
+  );
+
   return {
     id: remote.id,
     title: normaliseTitle(remote.title),
     document: cloneChartDocument(remote.document),
     updatedAt: remote.updated_at,
     ownerId: remote.user_id,
+    memberIds,
+    egoNodeId: membership?.ego_node_id ?? null,
     cloudId: remote.id,
     dirty: false,
     deleted: false,

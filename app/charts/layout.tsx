@@ -1,8 +1,11 @@
 import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 
+import {
+  getCurrentUserAndProfile,
+  isUserProfileComplete,
+} from "@/lib/profile";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { createClient } from "@/lib/supabase/server";
 
 export default async function ChartsLayout({
   children,
@@ -13,17 +16,14 @@ export default async function ChartsLayout({
     return children;
   }
 
-  const supabase = await createClient();
-  if (!supabase) {
-    return children;
-  }
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { user, profile } = await getCurrentUserAndProfile();
 
   if (!user) {
     redirect("/");
+  }
+
+  if (!isUserProfileComplete(profile)) {
+    redirect("/profile/setup?next=/");
   }
 
   return children;

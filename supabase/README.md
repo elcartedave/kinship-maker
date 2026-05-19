@@ -3,7 +3,9 @@
 ## Database
 
 1. Open the Supabase project **SQL Editor**.
-2. Run the statements in [`charts.sql`](./charts.sql). This creates the `charts` table and row-level security so each user only reads and writes their own rows.
+2. Run the statements in [`users.sql`](./users.sql). This updates the existing `users` table with the required profile columns (`first_name`, optional `middle_name`, `last_name`, `nickname`, and `age`) and row-level security so each user only reads and writes their own profile.
+3. Run the statements in [`charts.sql`](./charts.sql). This creates the `charts` table and row-level security so each user only reads and writes their own rows.
+4. Run the statements in [`collaboration.sql`](./collaboration.sql). This adds chart memberships, node-to-user links, and pending approval invitations.
 
 The app treats **Supabase as the source of truth** for chart rows when auth is enabled. IndexedDB on the client is only a cache for faster editing and offline use while signed in.
 

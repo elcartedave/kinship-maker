@@ -139,7 +139,11 @@ function getPartnerToken(node: KinshipSymbolNode): KinshipToken {
   return getKinshipGender(node.data.symbolType) === "male" ? "H" : "W";
 }
 
-function getPrimaryEgoId(nodes: KinshipSymbolNode[]) {
+function getPrimaryEgoId(nodes: KinshipSymbolNode[], preferredEgoId?: string | null) {
+  if (preferredEgoId && nodes.some((node) => node.id === preferredEgoId)) {
+    return preferredEgoId;
+  }
+
   return nodes.find((node) => isEgoSymbolType(node.data.symbolType))?.id ?? null;
 }
 
@@ -246,11 +250,12 @@ function getNeighbors(
 export function deriveKinshipLabels(
   nodes: KinshipNode[],
   edges: KinshipEdge[],
+  preferredEgoId?: string | null,
 ): DerivedKinshipLabelsResult {
   // Text annotation nodes have no kinship semantics — exclude them from the
   // graph so they don't show up as siblings/partners of nearby people.
   const symbolNodes = filterSymbolNodes(nodes);
-  const egoId = getPrimaryEgoId(symbolNodes);
+  const egoId = getPrimaryEgoId(symbolNodes, preferredEgoId);
 
   if (!egoId) {
     return {

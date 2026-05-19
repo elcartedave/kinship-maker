@@ -106,6 +106,8 @@ export type ChartRecord = {
   document: ChartDocument;
   updatedAt: string;
   ownerId?: string;
+  memberIds?: string[];
+  egoNodeId?: string | null;
   cloudId?: string;
   dirty: boolean;
   deleted: boolean;

@@ -20,10 +20,26 @@ function toTimestamp(value?: string) {
   return value ? new Date(value).getTime() : 0;
 }
 
-export function decideSyncAction(local: ChartRecord, remote: RemoteChartRecord) {
+export function decideSyncAction(
+  local: ChartRecord,
+  remote: RemoteChartRecord,
+) {
   const localUpdatedAt = toTimestamp(local.updatedAt);
   const remoteUpdatedAt = toTimestamp(remote.updated_at);
   const lastSyncedAt = toTimestamp(local.lastSyncedAt);
+  const hasSyncStamp = Boolean(local.lastSyncedAt);
+
+  if (!hasSyncStamp) {
+    if (local.dirty) {
+      return "push" as const;
+    }
+
+    if (remoteUpdatedAt > localUpdatedAt) {
+      return "pull" as const;
+    }
+
+    return "noop" as const;
+  }
 
   const localChangedAfterSync = local.dirty || localUpdatedAt > lastSyncedAt;
   const remoteChangedAfterSync = remoteUpdatedAt > lastSyncedAt;
@@ -50,8 +66,6 @@ async function pushChart(
 ) {
   const remoteId = local.cloudId ?? local.id;
   const payload = {
-    id: remoteId,
-    user_id: userId,
     title: local.title,
     document: local.document,
     updated_at: local.updatedAt,
@@ -62,7 +76,13 @@ async function pushChart(
   // server stores `updated_at` exactly as we send it (no trigger in
   // `supabase/charts.sql`). Skipping the readback halves the cloud-save
   // latency the user perceives.
-  const { error } = await client.from("charts").upsert(payload);
+  const { error } = local.cloudId
+    ? await client.from("charts").update(payload).eq("id", remoteId)
+    : await client.from("charts").insert({
+        ...payload,
+        id: remoteId,
+        user_id: userId,
+      });
 
   if (error) {
     throw error;
@@ -77,7 +97,10 @@ async function pushChart(
 
   await saveChartRecord({
     ...base,
-    ownerId: userId,
+    ownerId: local.ownerId ?? userId,
+    memberIds: Array.from(
+      new Set([...(base.memberIds ?? []), local.ownerId ?? userId, userId]),
+    ),
     cloudId: remoteId,
     dirty: stillDirty,
     deleted: false,
@@ -113,12 +136,16 @@ export async function pushSingleChart(
   // Defense in depth: if the local row was authored under a different
   // user (purgeChartsNotOwnedBy missed it for some reason), do not push
   // it — that path produces RLS 42501 errors.
-  if (local.ownerId != null && local.ownerId !== userId) {
+  if (
+    local.ownerId != null &&
+    local.ownerId !== userId &&
+    !local.memberIds?.includes(userId)
+  ) {
     return summary;
   }
 
   if (local.deleted) {
-    await deleteRemoteChart(client, local);
+    await deleteRemoteChart(client, local, userId);
     summary.deleted += 1;
     return summary;
   }
@@ -132,15 +159,26 @@ export async function pushSingleChart(
   return summary;
 }
 
-async function pullChart(remote: RemoteChartRecord) {
-  await saveChartRecord(remoteChartToLocal(remote));
+async function pullChart(remote: RemoteChartRecord, userId: string) {
+  await saveChartRecord(remoteChartToLocal(remote, userId));
 }
 
 async function deleteRemoteChart(
   client: SupabaseClient,
   local: ChartRecord,
+  userId: string,
 ) {
   const remoteId = local.cloudId ?? local.id;
+
+  if (local.ownerId && local.ownerId !== userId) {
+    await client
+      .from("chart_members")
+      .delete()
+      .eq("chart_id", remoteId)
+      .eq("user_id", userId);
+    await purgeChart(local.id);
+    return;
+  }
 
   await client.from("charts").delete().eq("id", remoteId);
   await purgeChart(local.id);
@@ -174,12 +212,15 @@ export async function syncChartsForUser(
   // is set to a different user must be skipped — pushing it would hit a
   // 42501 RLS error on the existing remote row owned by that other user.
   const localCharts = allLocalCharts.filter(
-    (chart) => chart.ownerId == null || chart.ownerId === userId,
+    (chart) =>
+      chart.ownerId == null ||
+      chart.ownerId === userId ||
+      chart.memberIds?.includes(userId),
   );
 
   for (const local of localCharts) {
     if (local.deleted) {
-      await deleteRemoteChart(client, local);
+      await deleteRemoteChart(client, local, userId);
       summary.deleted += 1;
       continue;
     }
@@ -199,7 +240,7 @@ export async function syncChartsForUser(
 
     if (decision === "conflict") {
       await saveChartRecord(createConflictCopy(local));
-      await pullChart(remote);
+      await pullChart(remote, userId);
       summary.conflicts += 1;
       continue;
     }
@@ -211,7 +252,7 @@ export async function syncChartsForUser(
     }
 
     if (decision === "pull") {
-      await pullChart(remote);
+      await pullChart(remote, userId);
       summary.pulled += 1;
       continue;
     }
@@ -219,7 +260,10 @@ export async function syncChartsForUser(
     if (!local.cloudId || local.lastSyncedAt !== remote.updated_at) {
       await saveChartRecord({
         ...local,
-        ownerId: userId,
+        ownerId: remote.user_id,
+        memberIds: Array.from(
+          new Set([...(local.memberIds ?? []), remote.user_id, userId]),
+        ),
         cloudId: remote.id,
         dirty: false,
         lastSyncedAt: remote.updated_at,
@@ -231,7 +275,7 @@ export async function syncChartsForUser(
     const existing = await getChartRecord(remote.id);
 
     if (!existing) {
-      await pullChart(remote);
+      await saveChartRecord(remoteChartToLocal(remote, userId));
       summary.pulled += 1;
     }
   }

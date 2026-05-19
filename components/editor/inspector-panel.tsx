@@ -26,6 +26,11 @@ import type {
 type InspectorPanelProps = {
   cloudStatus: string;
   currentTool: KinshipRelationshipType | null;
+  inviteFeedback?: string | null;
+  invitePending?: boolean;
+  canManageLinkedUser?: boolean;
+  linkedUserLoading?: boolean;
+  linkedUserLabel?: string | null;
   localStatus: string;
   onDeleteSelection?: () => void;
   onClose?: () => void;
@@ -34,6 +39,8 @@ type InspectorPanelProps = {
   onNodeLabelChange: (value: string) => void;
   onNodeNotesChange: (value: string) => void;
   onNodeSymbolTypeChange: (value: KinshipSymbolType) => void;
+  onNodeUserInvite?: (email: string) => void;
+  onNodeUserUnlink?: () => void;
   /** Patch the selected text node's data. */
   onTextNodeChange: (patch: Partial<KinshipTextNodeData>) => void;
   selectedEdge: KinshipEdge | null;
@@ -144,6 +151,20 @@ export function InspectorPanel(props: InspectorPanelProps) {
                 This stays editable until the node becomes part of the active Ego family network.
               </p>
             )}
+
+            {props.onNodeUserInvite ||
+            props.linkedUserLabel ||
+            props.linkedUserLoading ? (
+              <NodeUserInvite
+                feedback={props.inviteFeedback}
+                canManage={props.canManageLinkedUser}
+                linkedUserLabel={props.linkedUserLabel}
+                loading={props.linkedUserLoading}
+                onUnlink={props.onNodeUserUnlink}
+                pending={props.invitePending}
+                onInvite={props.onNodeUserInvite}
+              />
+            ) : null}
           </>
         ) : null}
 
@@ -216,6 +237,96 @@ export function InspectorPanel(props: InspectorPanelProps) {
         ) : null}
       </div>
     </section>
+  );
+}
+
+function NodeUserInvite({
+  canManage,
+  feedback,
+  linkedUserLabel,
+  loading,
+  onUnlink,
+  pending,
+  onInvite,
+}: {
+  canManage?: boolean;
+  feedback?: string | null;
+  linkedUserLabel?: string | null;
+  loading?: boolean;
+  onUnlink?: () => void;
+  pending?: boolean;
+  onInvite?: (email: string) => void;
+}) {
+  return (
+    <form
+      className="rounded-[1.25rem] border border-line bg-white/65 p-3"
+      onSubmit={(event) => {
+        event.preventDefault();
+        const form = event.currentTarget;
+        const formData = new FormData(form);
+        const email = String(formData.get("email") ?? "").trim();
+        if (!email || !onInvite) {
+          return;
+        }
+        onInvite(email);
+        form.reset();
+      }}
+    >
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-accent-strong">
+        Linked account
+      </p>
+      {loading && !linkedUserLabel ? (
+        <p className="mt-2 text-xs leading-5 text-ink-soft">
+          Loading linked account...
+        </p>
+      ) : linkedUserLabel ? (
+        <div className="mt-2 space-y-3">
+          <p className="text-sm leading-6 text-ink-soft">
+            This node is linked to <strong>{linkedUserLabel}</strong>.
+          </p>
+          {canManage && onUnlink ? (
+            <button
+              type="button"
+              onClick={onUnlink}
+              disabled={pending}
+              className="rounded-full border border-line bg-white px-3 py-2 text-xs font-semibold text-ink transition hover:border-accent/40 disabled:cursor-wait disabled:opacity-70"
+            >
+              Remove linked account
+            </button>
+          ) : null}
+        </div>
+      ) : onInvite ? (
+        <>
+          <p className="mt-2 text-xs leading-5 text-ink-soft">
+            Search by email to invite a real app user to approve this node as
+            themselves.
+          </p>
+          <div className="mt-3 flex gap-2">
+            <input
+              name="email"
+              type="email"
+              placeholder="person@example.com"
+              className="min-w-0 flex-1 rounded-xl border border-line bg-white px-3 py-2 text-xs text-ink outline-none transition focus:border-accent"
+              required
+            />
+            <button
+              type="submit"
+              disabled={pending}
+              className="rounded-full bg-accent px-3 py-2 text-xs font-semibold text-white transition hover:bg-accent-strong disabled:cursor-wait disabled:opacity-70"
+            >
+              Invite
+            </button>
+          </div>
+        </>
+      ) : (
+        <p className="mt-2 text-xs leading-5 text-ink-soft">
+          No account is linked to this node.
+        </p>
+      )}
+      {feedback ? (
+        <p className="mt-2 text-xs leading-5 text-ink-soft">{feedback}</p>
+      ) : null}
+    </form>
   );
 }
 
