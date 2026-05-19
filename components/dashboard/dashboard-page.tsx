@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import Image from 'next/image';
+import logoImg from "../../images/kinnect_logo.png";
 import { useRouter } from "next/navigation";
 import {
   useCallback,
@@ -26,6 +28,7 @@ import {
 } from "@/lib/kinship/local-store";
 import { createSampleChartDocument } from "@/lib/kinship/sample-chart";
 import type { ChartRecord } from "@/lib/kinship/types";
+
 
 function formatUpdatedAt(value: string) {
   return new Intl.DateTimeFormat(undefined, {
@@ -233,17 +236,50 @@ export function DashboardPage() {
   return (
     <main>
       
-      <nav id="navbar" className="fixed top-0 left-0 right-0 z-[100] flex items-center justify-between px-6 md:px-40 py-4 md:py-5 bg-cream/85 backdrop-blur-md border-b border-gold/15 transition-all duration-300">
-        <a href="#" className="flex items-center font-sans text-[22px] text-ink no-underline">
-        <span className="font-extrabold">Kin</span><span className="font-light">nect</span>
+    <nav id="navbar" className="fixed top-0 left-0 right-0 z-[100] flex items-center justify-between px-6 md:px-40 py-4 md:py-5 bg-cream/85 backdrop-blur-md border-b border-gold/15 transition-all duration-300">
+      
+      {/* Logo Block (Image + Text linked together) */}
+      <a href="#" className="flex items-center gap-2.5 no-underline text-ink">
+        <Image 
+          src={logoImg}
+          alt="Kinnect Logo" 
+          width={35} 
+          className="object-contain" 
+        />
+        <span className="font-sans text-xl tracking-tight">
+          <span className="font-extrabold">Kin</span>
+          <span className="font-light">nect</span>
+        </span>
       </a>
-        <ul className="hidden md:flex gap-8 list-none">
-          <li><a href="#features" className="text-sm font-medium text-slate no-underline tracking-wide transition-colors duration-200 hover:text-gold">Features</a></li>
-          <li><a href="#how" className="text-sm font-medium text-slate no-underline tracking-wide transition-colors duration-200 hover:text-gold">How it works</a></li>
-          <li><a href="#devs" className="text-sm font-medium text-slate no-underline tracking-wide transition-colors duration-200 hover:text-gold">Developers</a></li>
-        </ul>
-        <a href="#" className="px-[22px] py-2.5 rounded-lg bg-ink text-cream text-sm font-medium cursor-pointer border-none tracking-wide transition-all duration-250 no-underline inline-block hover:bg-gold hover:text-ink"><span className="text-cream inherited-hover-state">Get Started Free</span></a>
-      </nav>
+
+      {/* Navigation Links */}
+      <ul className="hidden md:flex gap-8 list-none m-0 p-0">
+        <li>
+          <a href="#features" className="text-sm font-medium text-slate no-underline tracking-wide transition-colors duration-200 hover:text-gold">
+            Features
+          </a>
+        </li>
+        <li>
+          <a href="#how" className="text-sm font-medium text-slate no-underline tracking-wide transition-colors duration-200 hover:text-gold">
+            How It Works
+          </a>
+        </li>
+        <li>
+          <a href="#team" className="text-sm font-medium text-slate no-underline tracking-wide transition-colors duration-200 hover:text-gold">
+            Developers
+          </a>
+        </li>
+      </ul>
+
+      {/* CTA Action Button */}
+      <a 
+        href="#" 
+        className="px-[22px] py-2.5 rounded-lg bg-ink !text-cream text-sm font-medium tracking-wide transition-all duration-200 no-underline inline-block hover:bg-gold hover:!text-ink"
+      >
+        Get Started Free
+      </a>
+
+    </nav>
 
       <section className="bg-cream min-h-screen grid grid-cols-1 md:grid-cols-2 items-center px-6 md:px-40 pt-[100px] md:pt-[120px] pb-[60px] md:pb-20 gap-6 md:gap-12 relative overflow-hidden">
 
