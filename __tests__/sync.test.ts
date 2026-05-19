@@ -59,4 +59,18 @@ describe("sync decisions", () => {
 
     expect(decideSyncAction(local, remote)).toBe("pull");
   });
+
+  test("pulls cloud-backed charts that do not have a sync stamp", () => {
+    const local = createChartRecord("Local");
+    local.cloudId = local.id;
+    local.updatedAt = "2026-05-08T02:00:00.000Z";
+    local.dirty = true;
+
+    const remote = createRemoteRecord({
+      id: local.id,
+      updated_at: "2026-05-08T01:00:00.000Z",
+    });
+
+    expect(decideSyncAction(local, remote)).toBe("pull");
+  });
 });

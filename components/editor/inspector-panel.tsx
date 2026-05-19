@@ -32,6 +32,8 @@ type InspectorPanelProps = {
   canManageLinkedUser?: boolean;
   linkedUserLoading?: boolean;
   linkedUserLabel?: string | null;
+  linkedUserFullName?: string | null;
+  linkedUserAge?: number | null;
   localStatus: string;
   onDeleteSelection?: () => void;
   onClose?: () => void;
@@ -104,6 +106,8 @@ export function InspectorPanel(props: InspectorPanelProps) {
                 </p>
               </div>
             </div>
+
+
 
             {props.onToggleCollapse && (
               <div className="rounded-[1.25rem] border border-line bg-white/75 px-3 py-3">
@@ -196,6 +200,8 @@ export function InspectorPanel(props: InspectorPanelProps) {
                 feedback={props.inviteFeedback}
                 canManage={props.canManageLinkedUser}
                 linkedUserLabel={props.linkedUserLabel}
+                linkedUserFullName={props.linkedUserFullName}
+                linkedUserAge={props.linkedUserAge}
                 loading={props.linkedUserLoading}
                 onUnlink={props.onNodeUserUnlink}
                 pending={props.invitePending}
@@ -287,6 +293,8 @@ function NodeUserInvite({
   canManage,
   feedback,
   linkedUserLabel,
+  linkedUserFullName,
+  linkedUserAge,
   loading,
   onUnlink,
   pending,
@@ -295,6 +303,8 @@ function NodeUserInvite({
   canManage?: boolean;
   feedback?: string | null;
   linkedUserLabel?: string | null;
+  linkedUserFullName?: string | null;
+  linkedUserAge?: number | null;
   loading?: boolean;
   onUnlink?: () => void;
   pending?: boolean;
@@ -324,9 +334,21 @@ function NodeUserInvite({
         </p>
       ) : linkedUserLabel ? (
         <div className="mt-2 space-y-3">
-          <p className="text-sm leading-6 text-ink-soft">
-            This node is linked to <strong>{linkedUserLabel}</strong>.
-          </p>
+          <div>
+            <p className="text-sm leading-6 text-ink-soft">
+              This node is linked to <strong>{linkedUserLabel}</strong>.
+            </p>
+            {linkedUserFullName ? (
+              <span className="block text-xs font-medium text-ink-soft/80 mt-1">
+                {linkedUserFullName}
+                {linkedUserAge != null ? ` • ${linkedUserAge} y/o` : ""}
+              </span>
+            ) : linkedUserAge != null ? (
+              <span className="block text-xs font-medium text-ink-soft/80 mt-1">
+                {linkedUserAge} y/o
+              </span>
+            ) : null}
+          </div>
           {canManage && onUnlink ? (
             <button
               type="button"

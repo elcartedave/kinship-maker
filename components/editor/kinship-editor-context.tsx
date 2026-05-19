@@ -2,7 +2,7 @@
 
 import { createContext, useContext } from "react";
 
-import type { KinshipTextNodeData } from "@/lib/kinship/types";
+import type { KinshipSymbolType, KinshipTextNodeData } from "@/lib/kinship/types";
 
 type KinshipEditorContextValue = {
   getNodeLabelState: (
@@ -13,6 +13,7 @@ type KinshipEditorContextValue = {
     isAutoDerived: boolean;
     value: string;
   };
+  getNodeSymbolType: (id: string, symbolType: KinshipSymbolType) => KinshipSymbolType;
   showConnectionHandles: boolean;
   updateNodeLabel: (id: string, label: string) => void;
   /**

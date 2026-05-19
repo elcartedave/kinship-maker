@@ -30,6 +30,10 @@ export function decideSyncAction(
   const hasSyncStamp = Boolean(local.lastSyncedAt);
 
   if (!hasSyncStamp) {
+    if (local.cloudId) {
+      return "pull" as const;
+    }
+
     if (local.dirty) {
       return "push" as const;
     }
@@ -131,24 +135,75 @@ export async function pushSingleChart(
   if (!local) {
     return summary;
   }
-  // Defense in depth: if the local row was authored under a different
-  // user (purgeChartsNotOwnedBy missed it for some reason), do not push
-  // it — that path produces RLS 42501 errors.
-  if (
-    local.ownerId != null &&
-    local.ownerId !== userId &&
-    !local.memberIds?.includes(userId)
-  ) {
+
+  const remoteId = local.cloudId ?? local.id;
+  const { data, error } = await client
+    .from("charts")
+    .select("id, user_id, title, document, updated_at")
+    .eq("id", remoteId)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  const remote = data as RemoteChartRecord | null;
+
+  if (!remote && local.cloudId) {
+    await purgeChart(local.id);
+    summary.deleted += 1;
     return summary;
   }
 
+  if (!remote && local.ownerId && local.ownerId !== userId) {
+    await purgeChart(local.id);
+    summary.deleted += 1;
+    return summary;
+  }
   if (local.deleted) {
     await deleteRemoteChart(client, local, userId);
     summary.deleted += 1;
     return summary;
   }
 
+  if (remote) {
+    const decision = decideSyncAction(local, remote);
+
+    if (decision === "pull") {
+      await pullChart(remote, userId);
+      summary.pulled += 1;
+      return summary;
+    }
+
+    if (decision === "noop") {
+      if (!local.cloudId || local.lastSyncedAt !== remote.updated_at) {
+        await saveChartRecord({
+          ...local,
+          ownerId: remote.user_id,
+          memberIds: Array.from(
+            new Set([...(local.memberIds ?? []), remote.user_id, userId]),
+          ),
+          cloudId: remote.id,
+          dirty: false,
+          lastSyncedAt: remote.updated_at,
+        });
+      }
+      return summary;
+    }
+  }
+
   if (!local.dirty) {
+    return summary;
+  }
+
+  if (
+    local.ownerId != null &&
+    local.ownerId !== userId &&
+    !local.memberIds?.includes(userId) &&
+    !remote
+  ) {
+    await purgeChart(local.id);
+    summary.deleted += 1;
     return summary;
   }
 
@@ -226,6 +281,18 @@ export async function syncChartsForUser(
     const remote = remoteMap.get(local.cloudId ?? local.id);
 
     if (!remote) {
+      if (local.cloudId) {
+        await purgeChart(local.id);
+        summary.deleted += 1;
+        continue;
+      }
+
+      if (local.ownerId && local.ownerId !== userId) {
+        await purgeChart(local.id);
+        summary.deleted += 1;
+        continue;
+      }
+
       if (local.dirty || !local.cloudId) {
         await pushChart(client, local, userId);
         summary.pushed += 1;

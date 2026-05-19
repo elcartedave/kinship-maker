@@ -183,6 +183,49 @@ export function AppShellProvider({
     };
   }, [supabase, syncNow, user]);
 
+  useEffect(() => {
+    if (!supabase || !user) {
+      return;
+    }
+
+    let active = true;
+    const channel = supabase
+      .channel(`charts-sync-${user.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "charts",
+        },
+        () => {
+          if (active) {
+            void syncNow();
+          }
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "chart_members",
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => {
+          if (active) {
+            void syncNow();
+          }
+        },
+      )
+      .subscribe();
+
+    return () => {
+      active = false;
+      void supabase.removeChannel(channel);
+    };
+  }, [supabase, syncNow, user]);
+
   const value = useMemo<AppShellContextValue>(
     () => ({
       authEnabled: isSupabaseConfigured,

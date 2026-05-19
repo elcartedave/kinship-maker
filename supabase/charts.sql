@@ -12,6 +12,20 @@ create table if not exists public.charts (
 
 alter table public.charts enable row level security;
 
+-- Enable realtime subscriptions for the charts table idempotently
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'charts'
+  ) then
+    alter publication supabase_realtime add table public.charts;
+  end if;
+end $$;
+
 drop policy if exists "Users manage only their charts" on public.charts;
 
 create policy "Users manage only their charts"

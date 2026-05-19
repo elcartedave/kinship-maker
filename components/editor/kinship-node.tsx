@@ -8,9 +8,10 @@ import { KinshipSymbolPreview } from "@/components/editor/kinship-symbol-preview
 import type { KinshipSymbolNode } from "@/lib/kinship/types";
 
 export function KinshipNode(props: NodeProps<KinshipSymbolNode>) {
-  const { getNodeLabelState, showConnectionHandles, updateNodeLabel } =
+  const { getNodeLabelState, getNodeSymbolType, showConnectionHandles, updateNodeLabel } =
     useKinshipEditorContext();
   const labelState = getNodeLabelState(props.id, props.data.label);
+  const symbolType = getNodeSymbolType(props.id, props.data.symbolType);
   const handleClassName = showConnectionHandles
     ? undefined
     : "kinship-handle-hidden";
@@ -23,7 +24,7 @@ export function KinshipNode(props: NodeProps<KinshipSymbolNode>) {
       >
         <div className="relative flex items-center justify-center" style={{ width: NODE_SHAPE_SIZE, height: NODE_SHAPE_SIZE }}>
           <KinshipSymbolPreview
-            symbolType={props.data.symbolType}
+            symbolType={symbolType}
             className="block shrink-0 -mb-1.5"
           />
           {props.data.isCollapsedBranchRoot && (

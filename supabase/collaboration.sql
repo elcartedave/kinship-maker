@@ -47,6 +47,19 @@ alter table public.chart_members enable row level security;
 alter table public.kinship_node_invitations enable row level security;
 alter table public.kinship_node_user_links enable row level security;
 
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'chart_members'
+  ) then
+    alter publication supabase_realtime add table public.chart_members;
+  end if;
+end $$;
+
 create or replace function public.is_chart_member(target_chart_id uuid)
 returns boolean
 language sql
@@ -419,11 +432,15 @@ begin
 end;
 $$;
 
+drop function if exists public.get_kinship_node_user_links(uuid);
+
 create or replace function public.get_kinship_node_user_links(target_chart_id uuid)
 returns table (
   node_id text,
   user_id uuid,
-  label text
+  label text,
+  full_name text,
+  age integer
 )
 language plpgsql
 security definer
@@ -438,7 +455,9 @@ begin
     select
       links.node_id,
       links.user_id,
-      coalesce(users.nickname, users.name, users.email, 'Linked user') as label
+      coalesce(users.nickname, users.name, users.email, 'Linked user') as label,
+      ltrim(rtrim(concat_ws(' ', users.first_name, users.middle_name, users.last_name))) as full_name,
+      users.age
     from public.kinship_node_user_links links
     left join public.users users on users.id = links.user_id
     where links.chart_id = target_chart_id;
