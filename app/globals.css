@@ -52,6 +52,23 @@ body {
   font-family: 'DM Sans', sans-serif;
 }
 
+/* Fallback brand color utilities in case theme tokens are not emitted. */
+.text-cream {
+  color: #f7f4ef;
+}
+
+.text-ink {
+  color: #0f0e0d;
+}
+
+.bg-cream {
+  background-color: #f7f4ef;
+}
+
+.bg-ink {
+  background-color: #0f0e0d;
+}
+
 a {
   color: inherit;
   text-decoration: none;

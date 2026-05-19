@@ -134,6 +134,9 @@ export function DashboardPage() {
   const [online, setOnline] = useState(() =>
     typeof navigator === "undefined" ? true : navigator.onLine,
   );
+  const [hydrated, setHydrated] = useState(false);
+  const pendingCount = pendingInvitations.length;
+  const hasPendingInvitations = hydrated && pendingCount > 0;
 
   const loadCharts = useCallback(async () => {
     if (!authEnabled) {
@@ -236,6 +239,10 @@ export function DashboardPage() {
   useEffect(() => {
     void loadPendingInvitations();
   }, [loadPendingInvitations, lastSync]);
+
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
 
   useEffect(() => {
     if (!authEnabled || !user || !supabase) {
@@ -589,15 +596,47 @@ export function DashboardPage() {
         </ul>
 
         {/* CTA Action Button */}
-        <a
-          href="#"
-          className="px-[22px] py-2.5 rounded-lg bg-ink !text-cream text-sm font-medium tracking-wide transition-all duration-200 no-underline inline-block hover:bg-gold hover:!text-ink"
-        >
-          Get Started Free
-        </a>
+        <div className="flex items-center gap-3">
+          <a
+            href="#collaboration-requests"
+            aria-hidden={!hasPendingInvitations}
+            tabIndex={hasPendingInvitations ? 0 : -1}
+            className={`relative px-3 py-2 rounded-lg border border-gold/30 bg-gold/10 text-xs font-semibold tracking-[0.12em] uppercase text-gold hover:bg-gold/20 ${
+              hasPendingInvitations ? "" : "pointer-events-none opacity-0"
+            }`}
+          >
+            Requests
+            <span className="absolute -top-2 -right-2 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-ink px-1 text-[10px] font-bold text-cream">
+              {pendingCount}
+            </span>
+          </a>
+          <a
+            href="#"
+            className="px-[22px] py-2.5 rounded-lg bg-ink text-cream text-sm font-medium tracking-wide transition-all duration-200 no-underline inline-block hover:bg-gold hover:text-ink"
+          >
+            Get Started Free
+          </a>
+        </div>
       </nav>
 
-      <section className="bg-cream min-h-screen grid grid-cols-1 md:grid-cols-2 items-center px-6 md:px-40 pt-[100px] md:pt-[120px] pb-[60px] md:pb-20 gap-6 md:gap-12 relative overflow-hidden">
+      {hasPendingInvitations ? (
+        <div className="fixed top-[72px] md:top-[84px] left-0 right-0 z-[90] px-4 md:px-12">
+          <div className="mx-auto flex w-full max-w-[1100px] items-center justify-between gap-4 rounded-[14px] border border-ink/10 bg-ink px-4 py-3 text-cream shadow-[0_16px_32px_rgba(0,0,0,.18)]">
+            <div className="text-sm font-semibold">
+              {pendingCount} collaboration request
+              {pendingCount === 1 ? "" : "s"} waiting.
+            </div>
+            <a
+              href="#collaboration-requests"
+              className="rounded-full bg-cream px-4 py-2 text-xs font-semibold text-ink transition hover:bg-gold"
+            >
+              Review now
+            </a>
+          </div>
+        </div>
+      ) : null}
+
+      <section className="bg-cream min-h-screen grid grid-cols-1 md:grid-cols-2 items-center px-6 md:px-40 pt-[120px] md:pt-[140px] pb-[60px] md:pb-20 gap-6 md:gap-12 relative overflow-hidden">
         <div className="relative z-10">
           <h1 className="font-serif text-[clamp(42px,5vw,72px)] font-black leading-[1.05] tracking-[-0.02em] mb-6">
             Connect your kin with{" "}
@@ -1029,6 +1068,63 @@ export function DashboardPage() {
           </div>
         </div>
       </section>
+
+      {hasPendingInvitations ? (
+        <section
+          id="collaboration-requests"
+          className="bg-white/90 px-6 md:px-12 py-12 md:py-16 border-t border-warm"
+        >
+          <div className="max-w-[1100px] mx-auto">
+            <div className="flex flex-wrap items-end justify-between gap-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold">
+                  Collaboration requests
+                </p>
+                <h2 className="font-serif text-[clamp(26px,3.6vw,40px)] font-extrabold text-ink">
+                  Review shared chart access
+                </h2>
+              </div>
+              <p className="text-sm text-slate">{pendingCount} pending</p>
+            </div>
+
+            <div className="mt-6 grid gap-4 md:grid-cols-2">
+              {pendingInvitations.map((invitation) => (
+                <article
+                  key={invitation.id}
+                  className="rounded-2xl border border-warm bg-cream/70 p-5 shadow-[0_10px_24px_rgba(0,0,0,.06)]"
+                >
+                  <p className="text-sm font-semibold text-ink">
+                    {invitation.inviterLabel}
+                    <span className="text-slate"> invited you to join </span>
+                    {invitation.chartTitle}.
+                  </p>
+                  <p className="mt-2 text-xs text-slate">
+                    Received {formatUpdatedAt(invitation.created_at)}
+                  </p>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void handleInvitation(invitation.id, "approve")}
+                      disabled={busyAction === invitation.id}
+                      className="rounded-full bg-ink px-4 py-2 text-xs font-semibold text-cream transition hover:bg-gold hover:text-ink disabled:cursor-wait disabled:opacity-70"
+                    >
+                      {busyAction === invitation.id ? "Working..." : "Approve"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleInvitation(invitation.id, "reject")}
+                      disabled={busyAction === invitation.id}
+                      className="rounded-full border border-ink/20 bg-white px-4 py-2 text-xs font-semibold text-ink transition hover:border-ink/40 disabled:cursor-wait disabled:opacity-70"
+                    >
+                      Decline
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+      ) : null}
 
       <section className="px-6 md:px-12 py-16 md:py-[96px]" id="features">
         <div className="max-w-[1100px] mx-auto">

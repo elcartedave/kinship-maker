@@ -16,5 +16,9 @@ export default async function Page() {
     }
   }
 
-  return <DashboardPage />;
+  return (
+    <div className="min-h-screen bg-cream text-ink">
+      <DashboardPage />
+    </div>
+  );
 }
