@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Fraunces, Manrope } from "next/font/google";
+import { Fraunces, Manrope, DM_Sans, Playfair_Display } from "next/font/google";
 
 import { APP_DESCRIPTION, APP_NAME, PAPER_BACKGROUND } from "@/lib/kinship/constants";
 import { AppShellProvider } from "@/components/providers/app-shell";
@@ -14,6 +14,18 @@ const displayFont = Fraunces({
 const bodyFont = Manrope({
   variable: "--font-body",
   subsets: ["latin"],
+});
+
+const dmSans = DM_Sans({
+  subsets: ["latin"],
+  variable: "--font-dm-sans", // This matches what we put in @theme!
+  display: "swap",
+});
+
+const playfair = Playfair_Display({
+  subsets: ["latin"],
+  variable: "--font-playfair", // This matches what we put in @theme!
+  display: "swap",
 });
 
 export const metadata: Metadata = {
