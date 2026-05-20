@@ -64,7 +64,7 @@ export function SymbolPalette({
                   event.dataTransfer.setData("text/plain", tool.type);
                   event.dataTransfer.effectAllowed = "copy";
                 }}
-                className={`relative flex aspect-square items-center justify-center overflow-hidden rounded-2xl border-2 transition hover:border-accent/60 focus:outline-none focus-visible:border-accent ${
+                className={`cursor-grab active:cursor-grabbing relative flex aspect-square items-center justify-center overflow-hidden rounded-2xl border-2 transition hover:border-accent/60 focus:outline-none focus-visible:border-accent ${
                   tool.type === currentTool
                     ? "border-accent bg-accent/5"
                     : "border-line bg-white/40 hover:bg-white/60"
@@ -91,7 +91,7 @@ export function SymbolPalette({
               event.stopPropagation();
               // Strict drag & drop: clicking a symbol does not arm placement mode.
             }}
-            className={`relative flex aspect-square items-center justify-center overflow-hidden rounded-2xl border-2 transition hover:border-accent/60 focus:outline-none focus-visible:border-accent ${
+            className={`cursor-grab active:cursor-grabbing relative flex aspect-square items-center justify-center overflow-hidden rounded-2xl border-2 transition hover:border-accent/60 focus:outline-none focus-visible:border-accent ${
               symbol.type === activeSymbolType
                 ? "border-accent bg-accent/5"
                 : "border-line bg-white/40 hover:bg-white/60"
@@ -125,7 +125,7 @@ export function SymbolPalette({
               event.preventDefault();
               event.stopPropagation();
             }}
-            className="relative flex aspect-square items-center justify-center overflow-hidden rounded-2xl border-2 border-line bg-white/40 transition hover:border-accent/60 hover:bg-white/60 focus:outline-none focus-visible:border-accent"
+            className="cursor-grab active:cursor-grabbing relative flex aspect-square items-center justify-center overflow-hidden rounded-2xl border-2 border-line bg-white/40 transition hover:border-accent/60 hover:bg-white/60 focus:outline-none focus-visible:border-accent"
           >
             <Type
               strokeWidth={2.4}
