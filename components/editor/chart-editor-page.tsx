@@ -548,6 +548,7 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
   // When set, the next viewport-state sync effect skips its instant
   // setViewport call so an in-flight animated viewport change isn't killed.
   const skipNextViewportSyncRef = useRef(false);
+  const [exportDrawerOpen, setExportDrawerOpen] = useState(false);
 
   useEffect(() => {
     chartStateRef.current = { nodes, edges, viewport };
@@ -2696,38 +2697,55 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
           />
         </aside>
 
-        {/* ---- Title panel ----------------------------------------------
-           Compact card pinned to the top-left. Holds the back link, chart
-           title, and a single-line of status pills. The canvas grid shows
-           through everywhere this panel doesn't reach (which is the entire
-           middle and right-hand band of the screen on desktop). */}
-        <header className="paper-panel kinship-toolbar-panel fixed top-3 left-3 z-40 w-[min(20rem,calc(100vw-1.5rem))] sm:w-auto sm:max-w-[22rem] rounded-[1.2rem] px-3 py-2">
-          {/* Plain <a> (not next/link) is intentional. The editor tree is
-             heavy (ReactFlow + many effects), so a client-side React commit
-             back to the dashboard takes a noticeable amount of time. A
-             full-page navigation lets the browser tear down the editor
-             natively, shows its loading indicator immediately, and lets the
-             existing `beforeunload` listener flush pending autosaves before
-             we leave (which the SPA cleanup would otherwise cancel). */}
-          <a
-            href="/"
-            className="text-[10px] font-semibold uppercase tracking-[0.22em] text-accent-strong sm:text-[11px]"
-          >
-            Back to dashboard
-          </a>
-          <input
-            type="text"
-            value={chartTitle}
-            onChange={(e) => {
-              setChartTitle(e.target.value);
-              persistImmediateSnapshot({ nextTitle: e.target.value });
-            }}
-            className="font-display mt-0.5 w-full border-0 bg-transparent p-0 text-lg text-ink outline-none transition focus:border-b-2 focus:border-accent sm:text-xl"
-            placeholder="Untitled chart"
-            aria-label="Chart title"
-          />
-          <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] text-ink-soft sm:text-[11px]">
-            <SaveStatusIndicator
+            {/* ---- Title panel ----------------------------------------------
+     Compact inline pill pinned to the top-left. Holds the logo/home link, 
+     chart title input, and the cloud save statuses in a single sleek row. */}
+      <header className="kinship-floating-panel fixed top-3 left-3 z-40 flex items-center gap-4 rounded-[2rem] bg-[#FAF8F5] border border-[#EBE6DD] px-4 py-2.5 shadow-sm max-w-[calc(100vw-1.5rem)] sm:max-w-none">
+        
+        {/* Left Section: Logo Avatar & Back Link */}
+        {/* Plain <a> (not next/link) is intentional. The editor tree is
+            heavy (ReactFlow + many effects), so a client-side React commit
+            back to the dashboard takes a noticeable amount of time. A
+            full-page navigation lets the browser tear down the editor
+            natively, shows its loading indicator immediately, and lets the
+            existing `beforeunload` listener flush pending autosaves before
+            we leave (which the SPA cleanup would otherwise cancel). */}
+        <a
+          href="/"
+          className="flex items-center gap-3 group outline-none"
+          aria-label="Back to dashboard"
+        >
+          {/* Circular Avatar / Placeholder Logo */}
+          <div className="h-8 w-8 rounded-full bg-[#D1D5DB] shrink-0" />
+          
+          {/* App/Brand Title */}
+          <span className="font-bold text-base text-black tracking-tight">
+            Kinnect
+          </span>
+          <span className="rounded-xl bg-[#CD953F] px-3 py-1 text-sm font-semibold text-white">
+            Home
+          </span>
+        </a>
+
+        {/* Middle Section: Chart Title Input */}
+        <input
+          type="text"
+          value={chartTitle}
+          onChange={(e) => {
+            setChartTitle(e.target.value);
+            persistImmediateSnapshot({ nextTitle: e.target.value });
+          }}
+          className="font-medium text-base text-black bg-transparent border-0 p-0 outline-none w-44 sm:w-52 placeholder-gray-400 focus:ring-0"
+          placeholder="Project Title Here"
+          aria-label="Chart title"
+        />
+
+        {/* Vertical Separator */}
+        <div className="h-4 w-[1px] bg-[#E5E7EB] hidden sm:block" />
+
+        {/* Right Section: Status Indicator & Meta Info */}
+        <div className="hidden sm:flex items-center gap-2 text-sm text-[#7F7F7F]">
+          <SaveStatusIndicator
               state={saveStatusState}
               onRetry={retryCloudSync}
             />
@@ -2739,177 +2757,243 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
                 Connecting: {activeTool.name}
               </span>
             ) : null}
-          </div>
-          <span className="sr-only">{cloudStatus}</span>
-        </header>
+        </div>
+
+        <span className="sr-only">{cloudStatus}</span>
+      </header>
 
         {/* ---- Toolbar panel ---------------------------------------------
            Auto-width card. Sits at the top-right on lg+ screens (so it
            doesn't fight the title panel for horizontal space) and falls back
            to a row directly under the title panel on smaller viewports. */}
-        <div
-          role="toolbar"
-          aria-label="Chart toolbar"
-          className="kinship-toolbar-panel fixed top-[110px] left-3 right-3 z-40 rounded-[1.2rem] px-2 py-1.5 sm:top-[104px] lg:top-3 lg:left-auto lg:right-3 lg:max-w-[calc(100vw-1.5rem)]"
-        >
-          <div className="flex flex-wrap items-center justify-center gap-0.5 lg:flex-nowrap lg:justify-end">
-            <IconToolbarButton
-              title="Hand tool — drag the canvas (left mouse)"
-              pressed={canvasTool === "hand"}
-              onClick={() => setCanvasTool("hand")}
-            >
-              <Hand strokeWidth={2} />
-            </IconToolbarButton>
-            <IconToolbarButton
-              title="Pointer tool — marquee select on empty canvas; middle/right drag or Space+drag to pan"
-              pressed={canvasTool === "pointer"}
-              onClick={() => setCanvasTool("pointer")}
-            >
-              <MousePointer2 strokeWidth={2} />
-            </IconToolbarButton>
-            <span
-              className="mx-1 hidden h-5 w-px shrink-0 bg-line sm:inline"
-              aria-hidden
-            />
-            <IconToolbarButton
-              title="Undo (Ctrl+Z / ⌘Z)"
-              disabled={!undoAvailable}
-              onClick={undo}
-            >
-              <Undo2 strokeWidth={2} />
-            </IconToolbarButton>
-            <IconToolbarButton
-              title="Redo (Ctrl+Y / ⌘Y or Ctrl+Shift+Z)"
-              disabled={!redoAvailable}
-              onClick={redo}
-            >
-              <Redo2 strokeWidth={2} />
-            </IconToolbarButton>
-            <span
-              className="mx-1 hidden h-5 w-px shrink-0 bg-line sm:inline"
-              aria-hidden
-            />
-            <IconToolbarButton
-              title="Copy selection (Ctrl+C / ⌘C)"
-              disabled={
-                selectedNodeIds.length === 0 && selectedEdgeIds.length === 0
-              }
-              onClick={copySelection}
-            >
-              <Copy strokeWidth={2} />
-            </IconToolbarButton>
-            <IconToolbarButton
-              title="Paste (Ctrl+V / ⌘V)"
-              disabled={!clipboardReady}
-              onClick={() => pasteSelection()}
-            >
-              <ClipboardPaste strokeWidth={2} />
-            </IconToolbarButton>
-            <IconToolbarButton
-              title="AI — describe your kin network and merge a draft onto the chart"
-              onClick={() => setAiGenerateOpen(true)}
-            >
-              <Sparkles strokeWidth={2} />
-            </IconToolbarButton>
-            <IconToolbarButton
-              title="Duplicate selection (Ctrl+D / ⌘D)"
+        // 1. Add a quick state hook at the top of your component if you don't have one:
+// const [exportDrawerOpen, setExportDrawerOpen] = useState(false);
+
+<div
+  role="toolbar"
+  aria-label="Chart toolbar"
+  className=" fixed top-3 right-3 z-40 flex flex-col items-end gap-3 max-w-[calc(100vw-1.5rem)] select-none"
+  >
+  {/* --- ROW 1: CORE UTILITIES PILL --- */}
+  <div className="kinship-floating-panel flex items-center gap-1.5 rounded-[2rem] bg-[#FAF8F5] border border-[#EBE6DD] px-3 py-2 shadow-sm">
+
+    {/* Hand Tool */}
+    <button
+      title="Hand tool — drag the canvas (left mouse)"
+      aria-pressed={canvasTool === "hand"}
+      onClick={() => setCanvasTool("hand")}
+      className={`p-2 rounded-full border transition-all ${
+        canvasTool === "hand" 
+          ? "bg-black text-white border-black" 
+          : "bg-transparent text-black border-[#EBE6DD] hover:bg-gray-100"
+      }`}
+    >
+      <Hand size={18} strokeWidth={2} />
+    </button>
+
+    {/* Pointer Tool */}
+    <button
+      title="Pointer tool — marquee select on empty canvas"
+      aria-pressed={canvasTool === "pointer"}
+      onClick={() => setCanvasTool("pointer")}
+      className={`p-2 rounded-full border transition-all ${
+        canvasTool === "pointer" 
+          ? "bg-black text-white border-black" 
+          : "bg-transparent text-black border-[#EBE6DD] hover:bg-gray-100"
+      }`}
+    >
+      <MousePointer2 size={18} strokeWidth={2} />
+    </button>
+
+    {/* Tiny Divider */}
+    <div className="h-4 w-[1px] bg-gray-200 mx-0.5" />
+
+    {/* Undo */}
+    <button
+      title="Undo (Ctrl+Z / ⌘Z)"
+      disabled={!undoAvailable}
+      onClick={undo}
+      className="p-2 rounded-full border border-[#EBE6DD] bg-transparent text-black transition hover:bg-gray-100 disabled:opacity-40 disabled:hover:bg-transparent"
+    >
+      <Undo2 size={18} strokeWidth={2} />
+    </button>
+
+    {/* Redo */}
+    <button
+      title="Redo (Ctrl+Y / ⌘Y or Ctrl+Shift+Z)"
+      disabled={!redoAvailable}
+      onClick={redo}
+      className="p-2 rounded-full border border-[#EBE6DD] bg-transparent text-black transition hover:bg-gray-100 disabled:opacity-40 disabled:hover:bg-transparent"
+    >
+      <Redo2 size={18} strokeWidth={2} />
+    </button>
+
+    {/* Tiny Divider */}
+    <div className="h-4 w-[1px] bg-gray-200 mx-0.5" />
+
+    {/* Copy */}
+    <button
+      title="Copy selection (Ctrl+C / ⌘C)"
+      disabled={selectedNodeIds.length === 0 && selectedEdgeIds.length === 0}
+      onClick={copySelection}
+      className="p-2 rounded-full border border-[#EBE6DD] bg-transparent text-black transition hover:bg-gray-100 disabled:opacity-40 disabled:hover:bg-transparent"
+    >
+      <Copy size={18} strokeWidth={2} />
+    </button>
+
+    {/* Paste */}
+    <button
+      title="Paste (Ctrl+V / ⌘V)"
+      disabled={!clipboardReady}
+      onClick={() => pasteSelection()}
+      className="p-2 rounded-full border border-[#EBE6DD] bg-transparent text-black transition hover:bg-gray-100 disabled:opacity-40 disabled:hover:bg-transparent"
+    >
+      <ClipboardPaste size={18} strokeWidth={2} />
+    </button>
+
+    {/* Duplicate */}
+    <button
+      title="Duplicate selection (Ctrl+D / ⌘D)"
+      onClick={() => {
+        if (selectedNodeIds.length > 1 || selectedEdgeIds.length > 0) {
+          duplicateSelection();
+          return;
+        }
+        if (!selectedNodeId) return;
+        commitBeforeChange();
+        const duplicated = duplicateNode(nodes, selectedNodeId);
+        setNodesState(duplicated.nodes);
+        persistImmediateSnapshot({ nextNodes: duplicated.nodes });
+        if (duplicated.createdId) {
+          setSelectedNodeIds([duplicated.createdId]);
+        } else {
+          setSelectedNodeIds([]);
+        }
+        setSelectedEdgeIds([]);
+      }}
+      className="p-2 rounded-full border border-[#EBE6DD] bg-transparent text-black transition hover:bg-gray-100"
+    >
+      <CopyPlus size={18} strokeWidth={2} />
+    </button>
+
+    {/* Delete */}
+    <button
+      title="Delete selection (Delete / Backspace)"
+      disabled={selectedNodeIds.length === 0 && selectedEdgeIds.length === 0}
+      onClick={deleteCurrentSelection}
+      className="p-2 rounded-full border border-[#EBE6DD] bg-transparent text-black transition hover:bg-gray-100 disabled:opacity-40 disabled:hover:bg-transparent"
+    >
+      <Trash2 size={18} strokeWidth={2} />
+    </button>
+
+    {/* Tiny Divider */}
+    <div className="h-4 w-[1px] bg-gray-200 mx-0.5" />
+
+    {/* Fit View */}
+    <button
+      title="Fit view to content"
+      onClick={fitViewToContent}
+      className="p-2 rounded-full border border-[#EBE6DD] bg-transparent text-black transition hover:bg-gray-100"
+    >
+      <Maximize2 size={18} strokeWidth={2} />
+    </button>
+
+    {/* Default View */}
+    <button
+      title="Default view — ideal zoom for placing symbols"
+      onClick={applyIdealViewport}
+      className="p-2 rounded-full border border-[#EBE6DD] bg-transparent text-black transition hover:bg-gray-100"
+    >
+      <Crosshair size={18} strokeWidth={2} />
+    </button>
+  </div>
+
+  {/* --- ROW 2: ACTION BUTTONS SUB-GROUP --- */}
+  <div className="flex items-center gap-3">
+    
+    {/* AI Button */}
+    <button
+      title="AI — describe your kin network and merge a draft onto the chart"
+      onClick={() => setAiGenerateOpen(true)}
+      className="inline-flex items-center justify-center gap-1.5 rounded-[2rem] bg-[#CD953F] px-5 py-3 font-semibold text-white text-sm shadow-sm transition hover:opacity-90 active:scale-95"
+    >
+      <span>AI</span>
+      <Sparkles size={16} strokeWidth={2} className="shrink-0" />
+    </button>
+
+    {/* Cloud/Sync Action Button */}
+    {authEnabled && (
+      <button
+        title={user ? "Sync with cloud" : "Sign in with Google to save this chart to the cloud"}
+        onClick={() => {
+          if (user) {
+            void flushThenSync();
+          } else {
+            void signInWithGoogle(`/charts/${chartId}`);
+          }
+        }}
+        className="rounded-[2rem] bg-[#CD953F] px-5 py-3 font-semibold text-white text-sm shadow-sm transition hover:opacity-90 active:scale-95 whitespace-nowrap"
+      >
+        Sync Now
+      </button>
+    )}
+
+    {/* Export Button & Drawer Container */}
+    <div className="relative flex flex-col items-center">
+      {/* Export Main Button */}
+      <button
+        onClick={() => setExportDrawerOpen(!exportDrawerOpen)}
+        className={`rounded-[2rem] bg-[#CD953F] px-5 py-3 font-semibold text-white text-sm shadow-sm transition hover:opacity-90 active:scale-95 min-w-[5.5rem] ${
+          exportDrawerOpen ? 'relative z-50' : ''
+        }`}
+      >
+        Export
+      </button>
+
+      {/* Custom Dropdown Drawer Card */}
+      {exportDrawerOpen && (
+        <>
+          {/* Click outside overlay */}
+          <div 
+            className="fixed inset-0 z-40 bg-transparent" 
+            onClick={() => setExportDrawerOpen(false)} 
+          />
+          
+          {/* Drawer content card pinned tightly beneath the button */}
+          <div className="absolute top-[85%] left-0 right-0 z-50 mt-1 flex flex-col gap-3 rounded-b-2xl rounded-t-sm bg-[#FAF8F5] border border-[#EBE6DD] border-t-0 p-4 pt-6 shadow-md transition-all animate-in fade-in slide-in-from-top-2 duration-150">
+            <button 
+              disabled={exporting !== null}
               onClick={() => {
-                if (selectedNodeIds.length > 1 || selectedEdgeIds.length > 0) {
-                  duplicateSelection();
-                  return;
-                }
-                if (!selectedNodeId) {
-                  return;
-                }
-                commitBeforeChange();
-                const duplicated = duplicateNode(nodes, selectedNodeId);
-                setNodesState(duplicated.nodes);
-                persistImmediateSnapshot({ nextNodes: duplicated.nodes });
-                if (duplicated.createdId) {
-                  setSelectedNodeIds([duplicated.createdId]);
-                } else {
-                  setSelectedNodeIds([]);
-                }
-                setSelectedEdgeIds([]);
+                void handleExport("png");
+                setExportDrawerOpen(false);
               }}
-            >
-              <CopyPlus strokeWidth={2} />
-            </IconToolbarButton>
-            <IconToolbarButton
-              title="Delete selection (Delete / Backspace)"
-              disabled={
-                selectedNodeIds.length === 0 && selectedEdgeIds.length === 0
-              }
-              onClick={deleteCurrentSelection}
-            >
-              <Trash2 strokeWidth={2} />
-            </IconToolbarButton>
-            <span
-              className="mx-1 hidden h-5 w-px shrink-0 bg-line sm:inline"
-              aria-hidden
-            />
-            <IconToolbarButton
-              title="Fit view to content"
-              onClick={fitViewToContent}
-            >
-              <Maximize2 strokeWidth={2} />
-            </IconToolbarButton>
-            <IconToolbarButton
-              title="Default view — ideal zoom for placing symbols"
-              onClick={applyIdealViewport}
-            >
-              <Crosshair strokeWidth={2} />
-            </IconToolbarButton>
-            <span
-              className="mx-1 hidden h-5 w-px shrink-0 bg-line sm:inline"
-              aria-hidden
-            />
-            <IconToolbarButton
-              title={
-                exporting === "png" ? "Exporting PNG…" : "Export chart as PNG"
-              }
-              disabled={exporting !== null}
-              className={`${
-                exporting === "png"
-                  ? "animate-pulse"
-                  : "!border-accent-strong bg-accent text-white hover:!bg-accent-strong"
+              className={`text-left font-bold text-sm text-[#4A4A4A] hover:text-black transition outline-none ${
+                exporting === "png" ? "animate-pulse opacity-60" : ""
               }`}
-              onClick={() => void handleExport("png")}
             >
-              <ImageDown
-                strokeWidth={2}
-                className={exporting !== null ? "opacity-60" : ""}
-              />
-            </IconToolbarButton>
-            <IconToolbarButton
-              title={
-                exporting === "pdf" ? "Exporting PDF…" : "Export chart as PDF"
-              }
+              as PNG
+            </button>
+            <button 
               disabled={exporting !== null}
-              className={exporting === "pdf" ? "animate-pulse" : ""}
-              onClick={() => void handleExport("pdf")}
+              onClick={() => {
+                void handleExport("pdf");
+                setExportDrawerOpen(false);
+              }}
+              className={`text-left font-bold text-sm text-[#4A4A4A] hover:text-black transition outline-none ${
+                exporting === "pdf" ? "animate-pulse opacity-60" : ""
+              }`}
             >
-              <FileText strokeWidth={2} />
-            </IconToolbarButton>
-            {authEnabled ? (
-              user ? (
-                <IconToolbarButton
-                  title="Sync with cloud"
-                  onClick={() => void flushThenSync()}
-                >
-                  <CloudUpload strokeWidth={2} />
-                </IconToolbarButton>
-              ) : (
-                <IconToolbarButton
-                  title="Sign in with Google to save this chart to the cloud"
-                  onClick={() => void signInWithGoogle(`/charts/${chartId}`)}
-                >
-                  <CloudUpload strokeWidth={2} />
-                </IconToolbarButton>
-              )
-            ) : null}
+              as PDF
+            </button>
           </div>
-        </div>
+        </>
+      )}
+    </div>
+
+    
+    
+  </div>
+</div>
 
         <AiGeneratePanel
           open={aiGenerateOpen}
