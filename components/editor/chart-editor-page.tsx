@@ -2576,7 +2576,7 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
         </section>
 
         {/* Palette clears the title panel (~96px tall on lg). */}
-        <aside className="kinship-floating-panel fixed left-3 top-[112px] z-40 hidden max-h-[calc(100vh-136px)] w-52 overflow-auto rounded-[1.2rem] p-2.5 lg:flex lg:flex-col">
+        <aside className="kinship-floating-panel fixed left-3 top-[90px] z-40 hidden max-h-[calc(100vh-136px)] w-52 overflow-auto rounded-[1.2rem] p-2.5 lg:flex lg:flex-col">
           <SymbolPalette
             activeSymbolType={activeSymbolType}
             onPickSymbol={armSymbolPlacement}
@@ -2586,7 +2586,7 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
         </aside>
 
         {/* Inspector clears the toolbar panel (~56px tall on lg). */}
-        <aside className="kinship-floating-panel fixed right-3 top-[76px] z-40 hidden max-h-[calc(100vh-100px)] w-64 overflow-auto rounded-[1.2rem] p-2.5 lg:block">
+        <aside className="kinship-floating-panel fixed right-3 top-[155px] z-40 hidden max-h-130 w-64 overflow-auto rounded-[1.2rem] p-2.5 lg:block">
           <InspectorPanel
             cloudStatus={cloudStatus}
             isNodeCollapsed={
