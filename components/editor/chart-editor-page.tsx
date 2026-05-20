@@ -2291,7 +2291,7 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
               </div>
             ) : (
               <ReactFlow
-                className={`kinship-canvas-grid ${
+                className={`${
                   canvasTool === "hand"
                     ? "canvas-tool-hand"
                     : "canvas-tool-pointer"
@@ -2548,7 +2548,7 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
                 <Background
                   color="rgba(128, 118, 103, 0.22)"
                   gap={24}
-                  variant={BackgroundVariant.Lines}
+                  variant={BackgroundVariant.Cross}
                 />
               </ReactFlow>
             )}
@@ -2750,7 +2750,7 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
         <div
           role="toolbar"
           aria-label="Chart toolbar"
-          className="paper-panel kinship-toolbar-panel fixed top-[110px] left-3 right-3 z-40 rounded-[1.2rem] px-2 py-1.5 sm:top-[104px] lg:top-3 lg:left-auto lg:right-3 lg:max-w-[calc(100vw-1.5rem)]"
+          className="kinship-toolbar-panel fixed top-[110px] left-3 right-3 z-40 rounded-[1.2rem] px-2 py-1.5 sm:top-[104px] lg:top-3 lg:left-auto lg:right-3 lg:max-w-[calc(100vw-1.5rem)]"
         >
           <div className="flex flex-wrap items-center justify-center gap-0.5 lg:flex-nowrap lg:justify-end">
             <IconToolbarButton
