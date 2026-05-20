@@ -12,8 +12,8 @@
   --color-slate: #3d4f5c;
   --color-mist: #c8d4da;
 
-  --font-sans: "DM Sans", sans-serif;
-  --font-serif: "Playfair Display", serif;
+  --font-sans: var(--font-dm-sans), var(--font-body), sans-serif;
+  --font-serif: var(--font-playfair), var(--font-display), serif;
 
   --animate-pulse-fast: pulse 2s infinite;
   --animate-float: float 6s ease-in-out infinite;
@@ -54,7 +54,7 @@ body {
 
 body {
   margin: 0;
-  font-family: "DM Sans", sans-serif;
+  font-family: var(--font-dm-sans), var(--font-body), sans-serif;
 }
 
 a {

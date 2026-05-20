@@ -53,11 +53,15 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const fontVariables = [
+    displayFont.variable,
+    bodyFont.variable,
+    dmSans.variable,
+    playfair.variable,
+  ].join(" ");
+
   return (
-    <html
-      lang="en"
-      className={`${displayFont.variable} ${bodyFont.variable} min-h-full antialiased`}
-    >
+    <html lang="en" className={`${fontVariables} min-h-full antialiased`}>
       <body className="min-h-full">
         <AppShellProvider>
           <ServiceWorkerRegistration />

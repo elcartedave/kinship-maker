@@ -73,6 +73,22 @@ function formatUpdatedAt(value: string) {
   }).format(new Date(value));
 }
 
+type OwnerProfile = {
+  id: string;
+  email: string | null;
+  name: string | null;
+  nickname: string | null;
+};
+
+function ownerProfileLabel(profile: OwnerProfile) {
+  return (
+    profile.nickname?.trim() ||
+    profile.name?.trim() ||
+    profile.email?.trim() ||
+    null
+  );
+}
+
 type SexAssignedAtBirth = "female" | "male" | null;
 
 function egoSymbolTypeForSex(sexAssignedAtBirth: SexAssignedAtBirth) {
@@ -208,13 +224,26 @@ export function DashboardPage({
       return;
     }
 
+    const chartIds = accessible.map((chart) => chart.id);
+    const ownerIds = Array.from(
+      new Set(
+        accessible
+          .map((chart) => chart.ownerId)
+          .filter((ownerId): ownerId is string => Boolean(ownerId)),
+      ),
+    );
+
     const { data: memberships } = await supabase
       .from("chart_members")
       .select("chart_id, user_id")
-      .in(
-        "chart_id",
-        accessible.map((chart) => chart.id),
-      );
+      .in("chart_id", chartIds);
+
+    const { data: ownerRows } = ownerIds.length
+      ? await supabase
+          .from("users")
+          .select("id, email, name, nickname")
+          .in("id", ownerIds)
+      : { data: [] };
 
     const memberIdsByChart = new Map<string, string[]>();
     for (const membership of memberships ?? []) {
@@ -223,10 +252,21 @@ export function DashboardPage({
       memberIdsByChart.set(membership.chart_id, current);
     }
 
+    const ownerLabels = new Map(
+      ((ownerRows ?? []) as OwnerProfile[])
+        .map((profile) => [profile.id, ownerProfileLabel(profile)] as const)
+        .filter((entry): entry is readonly [string, string] =>
+          Boolean(entry[1]),
+        ),
+    );
+
     startTransition(() =>
       setCharts(
         accessible.map((chart) => ({
           ...chart,
+          ownerLabel: chart.ownerId
+            ? (ownerLabels.get(chart.ownerId) ?? chart.ownerLabel)
+            : chart.ownerLabel,
           memberIds: memberIdsByChart.get(chart.id) ?? chart.memberIds,
         })),
       ),
@@ -1160,7 +1200,7 @@ export function DashboardPage({
                             <div className="mt-4 flex flex-wrap gap-2">
                               <span className="rounded-full bg-[#eef0e5] px-3 py-1 text-xs font-bold text-[#5f6d53]">
                                 {!canDelete
-                                  ? `Owned by ${chart.ownerLabel ?? "Other User"}`
+                                  ? `Owned by ${chart.ownerLabel ?? "chart owner"}`
                                   : authEnabled
                                     ? "Your Chart"
                                     : chart.ownerId
@@ -1389,7 +1429,7 @@ export function DashboardPage({
                                 </Link>
                                 <span className="rounded-full bg-[#eef0e5] px-2.5 py-0.5 text-[11px] font-bold text-[#5f6d53]">
                                   {!canDelete
-                                    ? `Made by ${chart.ownerLabel ?? "Other User"}`
+                                    ? `Owned by ${chart.ownerLabel ?? "chart owner"}`
                                     : authEnabled
                                       ? "Your Chart"
                                       : chart.ownerId

@@ -123,6 +123,7 @@ export type ChartRecord = {
   document: ChartDocument;
   updatedAt: string;
   ownerId?: string;
+  ownerLabel?: string;
   memberIds?: string[];
   egoNodeId?: string | null;
   cloudId?: string;

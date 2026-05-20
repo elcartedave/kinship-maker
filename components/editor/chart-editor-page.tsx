@@ -1033,39 +1033,37 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
       pendingAutosaveRef.current = false;
       skipNextAutosaveRef.current = true;
 
-      startTransition(() => {
-        setChartTitle(freshRecord.document.meta.title);
-        setCreatedAt(freshRecord.document.meta.createdAt);
-        setNodesState(nextNodes);
-        setEdgesState(nextEdges);
-        setViewport(nextViewport);
-        setSelectedNodeIds([]);
-        setSelectedEdgeIds([]);
-        setLocalStatus(
-          freshRecord.updatedAt
-            ? `Saved offline at ${formatSaveStamp(freshRecord.updatedAt)}`
-            : "Ready",
+      setChartTitle(freshRecord.document.meta.title);
+      setCreatedAt(freshRecord.document.meta.createdAt);
+      setNodesState(nextNodes);
+      setEdgesState(nextEdges);
+      setViewport(nextViewport);
+      setSelectedNodeIds([]);
+      setSelectedEdgeIds([]);
+      setLocalStatus(
+        freshRecord.updatedAt
+          ? `Saved offline at ${formatSaveStamp(freshRecord.updatedAt)}`
+          : "Ready",
+      );
+      setChartOwnerId(freshRecord.ownerId ?? null);
+      setSavedAt(freshRecord.updatedAt ?? null);
+      if (authEnabled && user) {
+        setEgoNodeId(freshRecord.egoNodeId ?? null);
+        setCloudPending(Boolean(freshRecord.dirty));
+        setCloudSavedAt(
+          freshRecord.dirty
+            ? (freshRecord.lastSyncedAt ?? null)
+            : (freshRecord.lastSyncedAt ?? freshRecord.updatedAt ?? null),
         );
-        setChartOwnerId(freshRecord.ownerId ?? null);
-        setSavedAt(freshRecord.updatedAt ?? null);
-        if (authEnabled && user) {
-          setEgoNodeId(freshRecord.egoNodeId ?? null);
-          setCloudPending(Boolean(freshRecord.dirty));
-          setCloudSavedAt(
-            freshRecord.dirty
-              ? (freshRecord.lastSyncedAt ?? null)
-              : (freshRecord.lastSyncedAt ?? freshRecord.updatedAt ?? null),
-          );
-          setCloudSaving(false);
-          setCloudErrored(false);
-        }
-        setLoading(false);
-        setReadyForAutosave(true);
-        historyPastRef.current = [];
-        historyFutureRef.current = [];
-        setUndoAvailable(false);
-        setRedoAvailable(false);
-      });
+        setCloudSaving(false);
+        setCloudErrored(false);
+      }
+      setLoading(false);
+      setReadyForAutosave(true);
+      historyPastRef.current = [];
+      historyFutureRef.current = [];
+      setUndoAvailable(false);
+      setRedoAvailable(false);
     },
     [authEnabled, setEdgesState, setNodesState, user],
   );
@@ -1366,33 +1364,29 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
       const hasNewerCleanRecord =
         !record.dirty && record.updatedAt !== appliedRecordUpdatedAtRef.current;
 
-      startTransition(() => {
-        setLocalStatus(`Saved offline at ${formatSaveStamp(record.updatedAt)}`);
-        setCloudSaving(false);
-        setCloudErrored(false);
-        // The Dexie row is the source of truth for "are there unsynced
-        // edits?". `dirty` is cleared by `pushChart` after the Supabase
-        // upsert succeeds, so honor it here.
-        setCloudPending(Boolean(record.dirty));
-        if (!record.dirty) {
-          setCloudSavedAt(stamp);
+      setLocalStatus(`Saved offline at ${formatSaveStamp(record.updatedAt)}`);
+      setCloudSaving(false);
+      setCloudErrored(false);
+      // The Dexie row is the source of truth for "are there unsynced
+      // edits?". `dirty` is cleared by `pushChart` after the Supabase
+      // upsert succeeds, so honor it here.
+      setCloudPending(Boolean(record.dirty));
+      if (!record.dirty) {
+        setCloudSavedAt(stamp);
 
-          if (lastSync.pulled > 0 || hasNewerCleanRecord) {
-            skipNextAutosaveRef.current = true;
-            pendingAutosaveRef.current = false;
-            appliedRecordUpdatedAtRef.current = record.updatedAt ?? null;
-            setChartTitle(record.document.meta.title);
-            setNodesState(hydrateNodes(record.document.nodes));
-            setEdgesState(hydrateEdges(record.document.edges));
-            setViewport(
-              sanitizeChartViewport(
-                record.document.viewport ?? DEFAULT_VIEWPORT,
-              ),
-            );
-            setSavedAt(record.updatedAt);
-          }
+        if (lastSync.pulled > 0 || hasNewerCleanRecord) {
+          skipNextAutosaveRef.current = true;
+          pendingAutosaveRef.current = false;
+          appliedRecordUpdatedAtRef.current = record.updatedAt ?? null;
+          setChartTitle(record.document.meta.title);
+          setNodesState(hydrateNodes(record.document.nodes));
+          setEdgesState(hydrateEdges(record.document.edges));
+          setViewport(
+            sanitizeChartViewport(record.document.viewport ?? DEFAULT_VIEWPORT),
+          );
+          setSavedAt(record.updatedAt);
         }
-      });
+      }
     });
   }, [
     authEnabled,
