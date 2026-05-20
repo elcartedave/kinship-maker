@@ -15,6 +15,8 @@ import {
   type ReactFlowInstance,
 } from "@xyflow/react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
+import logoImg from "../../images/kinnect_logo.png";
 import {
   startTransition,
   useCallback,
@@ -2715,13 +2717,19 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
           className="flex items-center gap-3 group outline-none"
           aria-label="Back to dashboard"
         >
-          {/* Circular Avatar / Placeholder Logo */}
-          <div className="h-8 w-8 rounded-full bg-[#D1D5DB] shrink-0" />
-          
           {/* App/Brand Title */}
-          <span className="font-bold text-base text-black tracking-tight">
-            Kinnect
-          </span>
+          <div className="flex items-center gap-2.5 no-underline text-ink">
+            <Image
+              src={logoImg}
+              alt="Kinnect Logo"
+              width={35}
+              className="object-contain"
+            />
+            <span className="font-sans text-xl tracking-tight">
+              <span className="font-extrabold">Kin</span>
+              <span className="font-light">nect</span>
+            </span>
+          </div>
           <span className="rounded-xl bg-[#CD953F] px-3 py-1 text-sm font-semibold text-white">
             Home
           </span>
