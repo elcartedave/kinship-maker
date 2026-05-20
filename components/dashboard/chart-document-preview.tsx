@@ -200,7 +200,6 @@ export function ChartDocumentPreview({
             zoomOnDoubleClick={false}
             deleteKeyCode={null}
             selectionKeyCode={null}
-            className="kinship-canvas-grid"
             style={{ width: "100%", height: "100%" }}
             proOptions={{ hideAttribution: true }}
           >
