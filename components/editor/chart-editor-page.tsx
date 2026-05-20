@@ -2291,7 +2291,7 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
               </div>
             ) : (
               <ReactFlow
-                className={`kinship-canvas-grid ${
+                className={`${
                   canvasTool === "hand"
                     ? "canvas-tool-hand"
                     : "canvas-tool-pointer"
@@ -2548,7 +2548,7 @@ export function ChartEditorPage({ chartId }: { chartId: string }) {
                 <Background
                   color="rgba(128, 118, 103, 0.22)"
                   gap={24}
-                  variant={BackgroundVariant.Lines}
+                  variant={BackgroundVariant.Cross}
                 />
               </ReactFlow>
             )}
